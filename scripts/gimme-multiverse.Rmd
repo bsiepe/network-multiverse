@@ -1,0 +1,100 @@
+---
+title: "gimme-multiverse"
+author: "Björn Siepe"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+In this document, we perform multiverse analysis for two datasets.
+
+
+# Preparation
+Load all relevant packages:
+```{r packages}
+library(mvgimme)       # fork of gimmme package that allows multiverse
+library(tidyverse)     # data handling
+library(here)          # reproducible folder settings
+
+```
+
+
+# Load reference fits
+We load the reference fits, i.e. results of GIMME as reported in the literature. 
+
+```{r load-ref-fits}
+ref_fit_pers <- readRDS(here("data/wright_2019/wright_2019_fit_nondetrend.RDS"))
+ref_fit_emot <- readRDS(here("data/kullar_2023/kullar_2023_fit.RDS"))
+```
+
+
+
+# Fit multiverse
+
+Multiverse parameters:
+```{r multiverse-params}
+
+group_cuts <- c(.50, .60, .75, .80)
+sub_cuts <- c(.50, .60, .75, .80)
+rsmea_cuts <- c(.03, .05, .08)
+srmr_cuts <- c(.03, .05, .08)
+nnfi_cuts <- c(.90, .95, .97)
+cfi_cuts <- c(.90, .95, .97)
+n_excels <- c(1, 2, 3)
+
+multiverse_grid <- expand.grid(
+  group_cuts = group_cuts,
+  sub_cuts = rsmea_cuts,
+  srmr_cuts = srmr_cuts,
+  nnfi_cuts = nnfi_cuts,
+  cfi_cuts = cfi_cuts,
+  n_excels = n_excels
+)
+
+```
+
+
+
+
+## Personality Dataset
+```{r multiverse-personality}
+
+
+```
+
+
+
+## Emotion Dataset
+
+```{r multiverse-personality}
+
+```
+
+
+# Analyze multiverse
+
+## Personality Dataset
+
+
+
+
+
+## Emotion Dataset
+
+
+
+# Visualize Multiverse
+
+## Personality Dataset
+
+### Manuscript
+
+
+### Supplement
+
+
+## Emotion Dataset
+
+### Manuscript
+
+
+### Supplement
