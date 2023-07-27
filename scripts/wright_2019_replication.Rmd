@@ -12,6 +12,9 @@ As code was not available online, we then fit a GIMME model with default setting
 ```{r packages}
 library(gimme)
 library(tidyverse)
+library(here)
+source(here("scripts/aux_funs.R"))
+
 ```
 
 
@@ -42,7 +45,7 @@ data_list <- readRDS(here::here("data/wright_2019/data_list.RDS"))
 # Preprocessing
 
 ## Detrending
-```{r}
+```{r detrend}
 rel_vars <- c("Dominance", "Affiliation", "PosAff",
               "NegAff", "Stress", "Functioning")
 data_list_detrend <- list()
@@ -65,25 +68,51 @@ for(p in 1:length(data_list)){
 ```
 
 
+## Descriptives
 
-# Fit Model
-```{r fit-gimme}
-fit <- gimme(
-  data = data_list_detrend,
-  out = "data/wright_2019/gimme_output",
-  ar = TRUE,           
-  plot = TRUE,         
-  subgroup = TRUE,     
-  hybrid = FALSE,      
-  groupcutoff = .75,   # unclear
-  subcutoff = .50,     # unclear
-)
+```{r descriptives}
+desc_list <- list()
 
+for(p in 1:length(data_list)){
+  desc_list[[p]] <- data_list[[p]] |> 
+    # summarize all relevant variables
+    dplyr::summarize(across(all_of(rel_vars),
+                            .fns = list(mean = ~mean(.x, na.rm = TRUE), 
+                                 sd = ~sd(.x, na.rm = TRUE))))
+  
+}
+# to dataframe
+df_desc <- bind_rows(desc_list, .id = "id")
+
+
+# Number of observations - apparently no full missings??
+mean(unlist(lapply(data_list, nrow)))
+sd(unlist(lapply(data_list, nrow)))
 
 ```
 
 
 
 
-# Sanity Check
-Compare our results with fitted results online to see if we specified the model in a similar way.
+# Fit Model
+We do not use detrended data, as not detrending let's us replicate the original analysis. 
+
+```{r fit-gimme}
+fit <- gimme(
+  data = data_list,
+  out = "data/wright_2019/gimme_output",
+  ar = TRUE,           
+  plot = TRUE,         
+  subgroup = TRUE,     
+  hybrid = FALSE,      
+  groupcutoff = .75,   # unclear
+  subcutoff = .50     # unclear
+  # standardize = TRUE   # try to handle variance issues
+)
+# saveRDS(fit, "data/wright_2019/wright_2019_fit_detrend.RDS")
+fit <- readRDS("data/wright_2019/wright_2019_fit_nondetrend.RDS")
+
+```
+
+
+
