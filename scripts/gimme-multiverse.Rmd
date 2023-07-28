@@ -14,7 +14,7 @@ Load all relevant packages:
 library(mvgimme)       # fork of gimmme package that allows multiverse
 library(tidyverse)     # data handling
 library(here)          # reproducible folder settings
-
+set.seed(35037)
 ```
 
 
@@ -35,7 +35,7 @@ Multiverse parameters:
 
 group_cuts <- c(.50, .60, .75, .80)
 sub_cuts <- c(.50, .60, .75, .80)
-rsmea_cuts <- c(.03, .05, .08)
+rmsea_cuts <- c(.03, .05, .08)
 srmr_cuts <- c(.03, .05, .08)
 nnfi_cuts <- c(.90, .95, .97)
 cfi_cuts <- c(.90, .95, .97)
@@ -43,7 +43,8 @@ n_excels <- c(1, 2, 3)
 
 multiverse_grid <- expand.grid(
   group_cuts = group_cuts,
-  sub_cuts = rsmea_cuts,
+  sub_cuts = sub_cuts,
+  rmsea_cuts = rmsea_cuts,
   srmr_cuts = srmr_cuts,
   nnfi_cuts = nnfi_cuts,
   cfi_cuts = cfi_cuts,
@@ -57,7 +58,18 @@ multiverse_grid <- expand.grid(
 
 ## Personality Dataset
 ```{r multiverse-personality}
-
+mv_res_pers <- mvgimme::multiverse.gimme(data = "data/wright_2019/individual_files",
+                          groupcutoffs = c(.50, .60, .75, .80), 
+                          subcutoffs = c(.50, .60, .75, .80),
+                          rmsea.cuts = c(.03, .05, .08),
+                          srmr.cuts = c(.03, .05, .08),
+                          nnfi.cuts = c(.90, .95, .97),
+                          cfi.cuts = c(.90, .95, .97),
+                          n.excellent = c(1, 2, 3),
+                          n.cores = 1,
+                          prune_output = TRUE,
+                          save_output = TRUE, 
+                          save_dir = "output/mv_personality")
 
 ```
 
@@ -66,19 +78,52 @@ multiverse_grid <- expand.grid(
 ## Emotion Dataset
 
 ```{r multiverse-personality}
-
+mv_res_emot <- mvgimme::multiverse.gimme(data = "data/kullar_2023/finaloutput",
+                          groupcutoffs = c(.50, .60, .75, .80), 
+                          subcutoffs = c(.50, .60, .75, .80),
+                          rmsea.cuts = c(.03, .05, .08),
+                          srmr.cuts = c(.03, .05, .08),
+                          nnfi.cuts = c(.90, .95, .97),
+                          cfi.cuts = c(.90, .95, .97),
+                          n.excellent = c(1, 2, 3),
+                          n.cores = 1,
+                          prune_output = TRUE,
+                          save_output = TRUE, 
+                          save_dir = "output/mv_emotion")
 ```
 
 
 # Analyze multiverse
 
 ## Personality Dataset
+Delete reference fit from multiverse dataset:
+```{r}
+mv_res_pers <- subset(mv_res_pers, !(group_cuts == .75 &
+                        sub_cuts == .75 &
+                        rsmea_cuts == .05 &
+                        srms_cuts == .05 &
+                        nnfi_cuts == .95 &
+                        cfi_cuts == .95 &
+                        n_excels == 2))
+```
 
 
 
 
 
 ## Emotion Dataset
+Delete reference fit from multiverse dataset:
+```{r}
+mv_res_emot <- subset(mv_res_emot, !(group_cuts == .75 &
+                        sub_cuts == .75 &
+                        rsmea_cuts == .05 &
+                        srms_cuts == .05 &
+                        nnfi_cuts == .95 &
+                        cfi_cuts == .95 &
+                        n_excels == 2))
+
+
+```
 
 
 
