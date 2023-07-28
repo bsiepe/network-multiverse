@@ -28,24 +28,26 @@ set.seed(35037)
 
 # Simulation settings
 Create a design with different sample sizes and time series lengths.
-Maybe also different sparsity levels?
+Maybe also different sparsity levels? 
 ```{r sim-settings}
 # sample_sizes <- c(50, 100, 200)
 # For testing only:
 sample_sizes <- c(20)
 # ts_lengths <- c(50, 100, 200)
-ts_lengths <- c(50,100)
+ts_lengths <- c(50, 100)
+# densities <- c(.2, .4)
+densities <- c(.2)
 replications <- 1000
 
 sim_design <- SimDesign::createDesign(sample_size = sample_sizes,
-                                  ts_length = ts_lengths)
+                                  ts_length = ts_lengths,
+                                  densities = densities)
 
 sim_pars <- list(
   p.con = .50, 
   nvar = 6, 
   AR =.3,
   p.group = .50,
-  dens = .20,
   con.b = .6,
   lag.b = -.3
 )
@@ -56,7 +58,7 @@ sim_pars <- list(
 
 # Data Generation
 ```{r true-dgp}
-# test_mat <- mat.generate.asw(p.con = .50, 
+# test_mat <- mat.generate.asw(p.con = .50,
 #                  nvar = 6, AR=.3,
 #                  p.group = .50,dens = .20,
 #                  con.b = .6,lag.b = -.3)
@@ -66,13 +68,13 @@ sim_pars <- list(
 #                              p.group = .50,dens = .20,
 #                              con.b = .6,lag.b = -.3,
 #                              p.con = .50)
-# 
-# res <- sim.gimme(p.con = .50, 
+
+# res <- sim.gimme(p.con = .50,
 #                  nvar = 6, AR=.3,
 #                  p.group = .50,dens = .20,
 #                  con.b = .6,lag.b = -.3,
 #                  n.ind = 20, t = 100)
-# 
+
 
 
 ```
@@ -90,12 +92,13 @@ sim_generate <- function(condition,
   # obtain condition parameters
   n <- condition$sample_size
   t <- condition$ts_length
+  d <- condition$densities
   
     sim_dat <- try(sim.gimme(
                    p.con = p.con, 
                    nvar = nvar,
                    AR = AR,
-                   dens = dens,
+                   dens = d,
                    p.group = p.group,
                    con.b = con.b,
                    lag.b = lag.b,
@@ -109,16 +112,24 @@ sim_generate <- function(condition,
   saveRDS(sim_dat, file = paste0("output/sim_dat_", n, "_", t,
                                    ".RDS"))
   
-  # create list of matrices
+  # list of data matrices
   l_dat <- lapply(sim_dat, function(x){
     as.matrix(x$series, ncol = nvar)
   })
   
-  # 
+  # list of edge weights
+  l_paths <- lapply(sim_dat, function(x){
+    x$paths
+  })
+  
+  # overall counts matrix
+  l_counts <- lapply(sim_dat, function(x){
+    ifelse(x$paths != 0, 1, 0)
+  })
+  path_counts <- Reduce('+', l_counts)
   
   
-  dat <- list(dat = l_dat,  # don't export parameters, or I get error later on
-  parameters = list(paths = sim_dat$paths))
+  dat <- list(dat = l_dat, ind_paths = l_paths, path_counts = path_counts)
   # levels = sim_dat$levels))
 }
 ```
@@ -134,7 +145,9 @@ sim_analyse_gimme_default <- function(condition, dat, fixed_objects = NULL){
   # obtain fixed objects
   Attach(fixed_objects)
   
-  # 
+  # save dgp parameters for later
+  dgp_ind_paths <- dat$ind_paths
+  dgp_path_counts <- dat$path_counts
   
   gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
@@ -143,7 +156,10 @@ sim_analyse_gimme_default <- function(condition, dat, fixed_objects = NULL){
                  subcutoff   = .75))
   if(is(gimme_res, 'try-error')) browser()
   
-  ret <- list(path_counts = gimme_res[[1]]$path_counts)
+  ret <- list(path_counts = gimme_res[[1]]$path_counts,
+              path_est_mats = gimme_res[[1]]$path_est_mats,
+              dgp_path_counts = dgp_path_counts,
+              dgp_ind_paths = dgp_ind_paths)
   ret
 }
 
@@ -244,19 +260,39 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   # For testing, compute some useless stat
   # n_paths <- try(sum(results$path_counts))
-  typeof(results)
-  head(results[[1]])
+  View(results)
   index <- 1:length(results)
-  # n_paths <- try(do.call(c, lapply(index, function(ind, results) sum(results[[ind]]$path_counts))))
   
-  # TODO need to come up with a way to analyze the results that does not throw an error
   n_paths <- try(lapply(seq_along(results), function(i){
     sum(results[[i]]$path_counts)
   }))
   
   if(is(n_paths, 'try-error')) browser()
+  
+  # Compare overall path counts
+  diff_path_counts <- lapply(seq_along(results), function(i){
+    sum(results[[i]]$dgp_path_counts - results[[i]]$path_counts)
+  })
+  
+  # Compute bias
+  bias_paths <- lapply(seq_along(results), function(i){
+     l_diff <- Map('-', results[[i]]$dgp_ind_paths, results[[i]]$path_est_mats)
+     lapply(l_diff, function(y){as.matrix(y)})
+  })
+  
+  # Aggregate bias
+  mean_diff_ests <- lapply(bias_paths, function(x){
+    l_tmp <- list()
+    mean_mat <- apply(simplify2array(x), 1:2, mean)
+    l_tmp$mean_nonzero_diff <- mean(abs(mean_mat[mean_mat != 0]))
+    l_tmp$mean_diff <- mean(abs(mean_mat))
+    return(l_tmp)
+  })
+  
   # Output
-  ret <- c(n_paths = n_paths)
+  ret <- c(n_paths = n_paths, 
+           diff_path_counts = diff_path_counts,
+           mean_diff = mean_diff_ests)
   ret <- unlist(ret)
   return(ret)
   
@@ -284,7 +320,8 @@ sim_res <- SimDesign::runSimulation(sim_design,
                                     # save_seeds = TRUE,
                                     packages = c("mvgimme"), 
                                     fixed_objects = sim_pars,
-                                    parallel = TRUE)
+                                    parallel = TRUE,
+                                    debug = "summarise")
 ```
 
 
