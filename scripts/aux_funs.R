@@ -242,37 +242,89 @@ sim.gimme <- function(p.con,
 # Multiverse Network Plot -------------------------------------------------
 # This function sums all adjacency matrices of all individuals
 # across all specifications, and then creates a plot where
-# thickness of graphs corresponds to number of inclusions
+# thickness of graphs corresponds to number of inclusions (irrespective of sign of edge)
 # see here: https://github.com/GatesLab/gimme/blob/cb0cf2f6b1cf5db5b16330966ccd8920cef15c66/gimme/R/summaryPathsCounts.R#L139
 
 multiverse.network <- function(mv_res, 
                                n_lagged = NULL, # number of lagged variables, assumed to be half the columns if not specified
-                               cutoff = NULL){  # only include effects with certain proportion of occurrence?          
+                               cutoff = NULL,    # only include effects with certain proportion of occurrence? 
+                               split_graph = TRUE){  # show temporal and contemporaneous seperated    
+  
+  # Count matrix across iterations
   count_mat <- as.matrix(Reduce('+', mv_res$adj_sum_mat_i))
+  
+  
+
+  
+  # Convert to proportions
+  prop_mat <- count_mat / nrow(mv_res)
+  
+  # Cutoff option
+  if(!is.null(cutoff)){
+    prop_mat[abs(prop_mat) < cutoff] <- 0
+  }
   
   # Split matrix based on lag vs. non-lagged
   if(is.null(n_lagged)){
-    n_lagged <-  ncol(count_mat)/2
+    n_lagged <-  ncol(prop_mat)/2
   }
-  
-  # Cutoff option
-  
+  temp_mat <- prop_mat[, 1:n_lagged]
+  cont_mat <- prop_mat[, (n_lagged + 1): ncol(prop_mat)]
   
   # Plot
-  qgraph::qgraphMixed(
-         undirected = count_mat[,(n_lagged+1):(ncol(count_mat))],
-         directed = count_mat[, 1: (n_lagged)],
-         layout       = "circle",
-         ltyUndirected = 1,
-         ltyDirected = 2,
-         edge.labels  = TRUE,
-         edge.color   = "blue",
-         parallelEdge = TRUE,
-         fade         = FALSE,
-         # arrows       = FALSE,
-         labels       = 
-           colnames(count_mat)[(n_lagged+1):(ncol(count_mat))],
-         label.cex    = 2)
+  if(isTRUE(split_graph)){
+    par(mfrow = c(1,2))
+    
+    # Temporal
+    qgraph::qgraph(
+      input = temp_mat, 
+      layout       = "circle",
+      lty = 1,
+      edge.labels  = TRUE,
+      theme = "colorblind",
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      fade         = FALSE,
+      # arrows       = FALSE,
+      labels = colnames(cont_mat),    # so that this does not show "lag" in name
+      label.cex    = 2,
+      title = "Temporal")
+    
+    # Contemporaneous
+    qgraph::qgraph(
+      input = cont_mat, 
+      layout  = "circle",
+      lty = 1,
+      edge.labels  = TRUE,
+      theme = "colorblind",
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      fade = FALSE,
+      # arrows   = FALSE,
+      labels = colnames(cont_mat),
+      label.cex = 2,
+      title = "Contemporaneous")
+    
+  }
+  
+  
+  if(isFALSE(split_graph)){
+    qgraph::qgraphMixed(
+      undirected = prop_mat[,(n_lagged+1):(ncol(prop_mat))],
+      directed = prop_mat[, 1: (n_lagged)],
+      layout       = "circle",
+      ltyUndirected = 1,
+      ltyDirected = 2,
+      edge.labels  = TRUE,
+      edge.color   = "blue",
+      parallelEdge = TRUE,
+      fade         = FALSE,
+      # arrows       = FALSE,
+      labels       = 
+        colnames(prop_mat)[(n_lagged+1):(ncol(prop_mat))],
+      label.cex    = 2)
+  }
+
   
 }
 
@@ -305,6 +357,38 @@ fn_detrend <- function(x,
 }
 
 
+
+# ggplot2 theme -----------------------------------------------------------
+theme_multiverse <- function() {
+  # add google font
+  sysfonts::font_add_google("News Cycle", "news")
+  # use showtext
+  showtext::showtext_auto()
+  # theme
+  ggplot2::theme_minimal(base_family = "news") +
+    ggplot2::theme(
+      # remove minor grid
+      panel.grid.minor = ggplot2::element_blank(),
+      # Title and Axis Texts
+      plot.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(1.2), hjust = 0.5),
+      plot.subtitle = ggplot2::element_text(size = ggplot2::rel(1.1), hjust = 0.5),
+      axis.title = ggplot2::element_text(size = ggplot2::rel(1.1)),
+      axis.text = ggplot2::element_text(size = ggplot2::rel(1)),
+      axis.text.x = ggplot2::element_text(margin = ggplot2::margin(5, b = 10)),
+      
+      # Faceting
+      strip.text = ggplot2::element_text(face = "plain", size = ggplot2::rel(1.1), hjust = 0.5),
+      strip.background = ggplot2::element_rect(fill = NA, color = NA),
+      # Grid
+      panel.grid = ggplot2::element_line(colour = "#F3F4F5"),
+      # Legend
+      legend.title = ggplot2::element_text(face = "plain"),
+      legend.position = "top",
+      legend.justification = 1,
+      # Panel/Facets
+      panel.spacing.y = ggplot2::unit(1.5, "lines")
+    )
+}
 
 
 
