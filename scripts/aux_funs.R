@@ -271,6 +271,12 @@ simulateVARtest <- function(A         = NULL,
     PhiList[[1]] <- Phi
   }
   
+  # BS: Added this: If Phi is a List, PhiList is empty now. This throws an error
+  # 
+  if(is.list(Phi)){
+    PhiList <- Phi
+  }
+  
   if(is.null(Psi)){
     Psi <- matrix(0, nrow = dim(PhiList[[1]])[1], ncol = dim(PhiList[[1]])[2])
     diag(Psi) <- 1
