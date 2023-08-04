@@ -2,6 +2,7 @@ library(tidyverse)
 library(mvgimme)
 library(cowplot)
 source("scripts/aux_funs.R")
+set.seed(35037)
 
 data <- mvgimme::simData
 
@@ -53,6 +54,84 @@ test_individual <- multiverse.compare.individual(l_res = mv_res,
 
 
 
+
+
+# New try in data generation
+
+# contemp.
+a_mat <- matrix(data = runif(n = 36, min = .15, max = .5), nrow = 6, ncol = 6)
+a_prob <- matrix(rbinom(36, size = 1, 0.2), nrow = 6, ncol = 6)
+a_mat <- a_mat * a_prob
+diag(a_mat) <- rep(0, 6)
+
+# lagged
+phi_mat <- matrix(data = runif(n = 36), nrow = 6, ncol = 6)
+phi_prob <- matrix(rbinom(36, size = 1, 0.2), nrow = 6, ncol = 6)
+phi_mat <- phi_mat * phi_prob
+diag(phi_mat) <- rep(.3, 6)
+
+psi_mat <- matrix(data = rep(0, 36), nrow = 6, ncol = 6)
+diag(psi_mat) <- rep(1, 6)
+# psi_mat <- as.matrix(Matrix::forceSymmetric(psi_mat))
+group_ind <- c(rep(1, 10), rep(2, 10))
+n_ind <- length(group_ind)
+n_tp <- 150
+
+data <- simulateVARtest(A = a_mat, 
+                   Phi = phi_mat,
+                   # Psi = psi_mat,
+                   # subAssign = group_ind,
+                   N = n_ind,
+                   Obs = n_tp)
+
+
+
+# With subgroups of equal size
+
+
+# change position of one effect, add small noise to other effects
+# for contemporaneous matrix
+a_1 <- a_mat
+a_2 <- a_1
+a_2[5,3] <- a_2[6,3]
+a_2[6,3] <- 0
+nonzero <- which(a_2 != 0)
+a_2[nonzero] <- a_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .05)
+
+a_list <- list(a_1, a_2)
+
+
+# for temporal matrix
+phi_1 <- phi_mat
+phi_2 <- phi_1
+phi_2[5,1] <- phi_2[6,1]
+phi_2[6,1] <- 0
+nonzero <- which(phi_2 != 0)
+phi_2[nonzero] <- phi_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .05)
+
+phi_list <- list(phi_1, phi_2)
+
+group_ind <- c(rep(1, 10), rep(2, 10))
+n_ind <- length(group_ind)
+n_tp <- 150
+
+
+psi_list <- list(psi_mat, psi_mat)
+data_sub <- simulateVARtest(A = a_list, 
+                                    Phi = phi_list,
+                                    Psi = psi_list,
+                                    subAssign = group_ind,
+                                    N = n_ind,
+                                    Obs = n_tp)
+
+
+# Test fitting a model on it
+test_res <- mvgimme::gimme(data_sub$dataList, 
+               subgroup = TRUE,
+               ar = TRUE)
+
+
+
 # -------------------------------------------------------------------------
 # Visualizations ----------------------------------------------------------
 # -------------------------------------------------------------------------
@@ -101,6 +180,8 @@ library(RColorBrewer)
 palette_3 <- colorRampPalette(brewer.pal(9, "RdBu"))(3)
 palette_4 <- colorRampPalette(brewer.pal(9, "RdBu"))(4)
 
+# TODO change blue color values
+
 # Set values explicitly 
 palette_full <- c(palette_4[1:2], palette_3[3], palette_4[3:4])
 names(palette_full) <- c("liberal", "medium-liberal", "medium", "medium-strict", "strict")
@@ -129,7 +210,7 @@ plot_outcome <- function(mv_res,
     dplyr::mutate(iteration = dplyr::row_number()) %>%
     ggplot(aes(x = .data$iteration,
                y = variable)) + 
-    geom_point()+
+    geom_point(size = 0.8)+
     theme_multiverse()
 }
 
@@ -167,7 +248,7 @@ plot_specification <- function(mv_res,
              y = 1,
              color = .data$value)) + 
     geom_point(shape = 124, size = 15
-               #pch='.'
+               #pch='.'   #for faster plotting
                 )+
     scale_y_continuous(limits = c(0.99, 1.01), expand = c(0,0))+
     theme_multiverse()+
@@ -188,32 +269,40 @@ plot_specification <- function(mv_res,
 # for testing
 df_mv_test <- dplyr::slice_sample(df_mv, n = 400)
 
-test_out <- plot_outcome(mv_res = df_mv_test, var = heterogeneity_g)
-test_out
+test_out <- plot_outcome(mv_res = df_mv, var = heterogeneity_g)
+# test_out
 
-test_spec <- plot_specification(mv_res = df_mv_test, var = heterogeneity_g)
-test_spec
-ggsave("test.svg", test_spec, device = "svg", height = 11, width = 11)
+test_spec <- plot_specification(mv_res = df_mv, var = heterogeneity_g)
+# test_spec
+# ggsave("test.svg", test_spec, device = "svg", height = 11, width = 11)
 
 
 # Combine Plots
-cowplot::plot_grid(test_out, test_spec, 
+comb_plot <- cowplot::plot_grid(test_out, test_spec, 
                    nrow = 2, align = "h",
                    rel_heights = c(0.5,1))
-
+ggsave("comb_plot.svg", comb_plot, device = "svg", height = 11, width = 11)
 
 
 # Subgroup-Level ----------------------------------------------------------
+# Number of subgroups
 
+
+
+# Visualize ARI/VI/Modularity across datasets
 
 
 
 # Individual-Level --------------------------------------------------------
+# Difference in edge weights
+# we could also do this with specification curve analysis?
+
+
+# difference in network summaries
 
 
 
-
-
+# difference in fit measures
 
 
 
