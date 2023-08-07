@@ -59,36 +59,52 @@ test_individual <- multiverse.compare.individual(l_res = mv_res,
 # New try in data generation
 
 # contemp.
-a_mat <- matrix(data = runif(n = 36, min = .15, max = .5), nrow = 6, ncol = 6)
-a_prob <- matrix(rbinom(36, size = 1, 0.2), nrow = 6, ncol = 6)
-a_mat <- a_mat * a_prob
-diag(a_mat) <- rep(0, 6)
+# a_mat <- matrix(data = runif(n = 36, min = .15, max = .5), nrow = 6, ncol = 6)
+# a_prob <- matrix(rbinom(36, size = 1, 0.2), nrow = 6, ncol = 6)
+# a_mat <- a_mat * a_prob
+# diag(a_mat) <- rep(0, 6)
+
+# manually
+a_mat <- matrix(c(
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.25, 0.40, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.15,
+  0.00, 0.00, 0.35, 0.00, 0.00, 0.00
+), nrow = 6, byrow = TRUE)
+
+
+# Write to supplemental material (fn from https://www.r-bloggers.com/2020/08/matrix-to-latex/)
+array_to_LaTeX <- function(arr){
+  rows <- apply(arr, MARGIN=1, paste, collapse = " & ")
+  matrix_string <- paste(rows, collapse = " \\\\ ")
+  return(paste("\\begin{bmatrix}", matrix_string, "\\end{bmatrix}"))
+  }
 
 # lagged
-phi_mat <- matrix(data = runif(n = 36), nrow = 6, ncol = 6)
-phi_prob <- matrix(rbinom(36, size = 1, 0.2), nrow = 6, ncol = 6)
-phi_mat <- phi_mat * phi_prob
-diag(phi_mat) <- rep(.3, 6)
+# phi_mat <- matrix(data = runif(n = 36, min = .05, max = .4), nrow = 6, ncol = 6)
+# 
+# phi_prob <- matrix(rbinom(36, size = 1, 0.2), nrow = 6, ncol = 6)
+# phi_mat <- phi_mat * phi_prob
+# diag(phi_mat) <- rep(.3, 6)
+
+ar_e <- 0.3
+# manually
+phi_mat <- matrix(c(
+  ar_e, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, ar_e, 0.00, 0.00, 0.10, 0.00,
+  0.00, 0.00, ar_e, 0.00, 0.00, 0.20,
+  0.00, 0.00, 0.00, ar_e, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, ar_e, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, ar_e
+), nrow = 6, byrow = TRUE)
+
 
 psi_mat <- matrix(data = rep(0, 36), nrow = 6, ncol = 6)
 diag(psi_mat) <- rep(1, 6)
-# psi_mat <- as.matrix(Matrix::forceSymmetric(psi_mat))
-group_ind <- c(rep(1, 10), rep(2, 10))
-n_ind <- length(group_ind)
-n_tp <- 150
-
-data <- simulateVARtest(A = a_mat, 
-                   Phi = phi_mat,
-                   # Psi = psi_mat,
-                   # subAssign = group_ind,
-                   N = n_ind,
-                   Obs = n_tp)
-
-
 
 # With subgroups of equal size
-
-
 # change position of one effect, add small noise to other effects
 # for contemporaneous matrix
 a_1 <- a_mat
@@ -96,7 +112,7 @@ a_2 <- a_1
 a_2[5,3] <- a_2[6,3]
 a_2[6,3] <- 0
 nonzero <- which(a_2 != 0)
-a_2[nonzero] <- a_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .05)
+a_2[nonzero] <- a_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .1)
 
 a_list <- list(a_1, a_2)
 
@@ -107,13 +123,13 @@ phi_2 <- phi_1
 phi_2[5,1] <- phi_2[6,1]
 phi_2[6,1] <- 0
 nonzero <- which(phi_2 != 0)
-phi_2[nonzero] <- phi_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .05)
+phi_2[nonzero] <- phi_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .1)
 
 phi_list <- list(phi_1, phi_2)
 
-group_ind <- c(rep(1, 10), rep(2, 10))
+group_ind <- c(rep(1, 15), rep(2, 15))
 n_ind <- length(group_ind)
-n_tp <- 150
+n_tp <- 100
 
 
 psi_list <- list(psi_mat, psi_mat)
@@ -122,7 +138,9 @@ data_sub <- simulateVARtest(A = a_list,
                                     Psi = psi_list,
                                     subAssign = group_ind,
                                     N = n_ind,
-                                    Obs = n_tp)
+                                    Obs = n_tp,
+                            indA = 0.3,
+                            indPhi = 0.1)
 
 
 # Test fitting a model on it
