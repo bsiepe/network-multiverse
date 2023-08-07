@@ -120,5 +120,44 @@ sgimmefit <- gimme(data = "data/kullar_2023/finaloutput", #folder with individua
          subcutoff   = .51) 
 
 saveRDS(sgimmefit, file = "data/kullar_2023/kullar_2023_fit.RDS")
+sgimmefit <- readRDS("data/kullar_2023/kullar_2023_fit.RDS")
+
+
+
 ```
+
+
+
+
+# Summarize GIMME
+Obtain some individual level summaries: 
+```{r summarize-gimme}
+# Indicator for temporal and contemporaneous network
+n_vars <- sgimmefit$n_vars_total
+temp_ind <- 1:(n_vars/2)
+cont_ind <- ((n_vars/2)+1) : n_vars
+
+# Check path summary
+sgimmefit$path_counts[,temp_ind]
+sgimmefit$path_counts[,cont_ind]
+
+# centrality
+cent_values <- lapply(sgimmefit$path_est_mats, function(x){
+  if(is.double(x)){
+    colSums(abs(x))}
+  })
+
+max_temp <- list()
+max_cont <- list()
+for(i in seq_along(cent_values)){
+  max_temp[[i]] <- names(which.max(cent_values[[i]][temp_ind]))
+  max_cont[[i]] <- names(which.max(cent_values[[i]][cont_ind]))
+}
+
+table(unlist(max_temp))
+table(unlist(max_cont))
+
+```
+
+
 

@@ -116,3 +116,35 @@ fit <- readRDS("data/wright_2019/wright_2019_fit_nondetrend.RDS")
 
 
 
+# Summaries
+Obtain some individual level summaries: 
+```{r summarize-gimme}
+# Indicator for temporal and contemporaneous network
+n_vars <- fit$n_vars_total
+temp_ind <- 1:(n_vars/2)
+cont_ind <- ((n_vars/2)+1) : n_vars
+
+# Check path summary
+fit$path_counts[, temp_ind]
+fit$path_counts[, cont_ind]
+
+# centrality
+cent_values <- lapply(fit$path_est_mats, function(x){
+  colSums(abs(x))})
+
+max_temp <- list()
+max_cont <- list()
+for(i in seq_along(cent_values)){
+  max_temp[[i]] <- names(which.max(cent_values[[i]][temp_ind]))
+  max_cont[[i]] <- names(which.max(cent_values[[i]][cont_ind]))
+}
+
+table(unlist(max_temp))
+table(unlist(max_cont))
+
+```
+
+
+
+
+
