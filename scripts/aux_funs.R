@@ -322,6 +322,9 @@ simulateVARtest <- function(A         = NULL,
   
   Ind.nonstation <- c()
   
+  # storing individual parameter matrices
+  indList <- list()
+  
   for (ind in 1:N) {
     go <- 1
     counter <- 0                                   
@@ -334,37 +337,76 @@ simulateVARtest <- function(A         = NULL,
       PhiMean <- mean(PhiTemp)
       PsiMean <- mean(PsiTemp)
       
-      if(indA>0){
-        ATemp[which(ATemp == 0)] <- stats::rbinom(1,1,indA)
-        if(ASign == "random"){
-          random.sign <- sample(c(0,1), size=1)
-          if(random.sign==0) {ATemp[which(ATemp == 1)] <- -stats::rnorm(1, AMean, 0.3)}
-          if(random.sign==1) {ATemp[which(ATemp == 1)] <- stats::rnorm(1, AMean, 0.3)}
-        }
-        if(ASign == "neg")
-          ATemp[which(ATemp == 1)] <- -stats::rnorm(1, AMean, 0.3)
-        if(ASign == "pos")
-          ATemp[which(ATemp == 1)] <- stats::rnorm(1, AMean, 0.3)
-        diag(ATemp) <- 0
-      }
+      # BS: change such that indA applies to individual elements,
+      # not all elements of that person 
       
-      if(indPhi>0){
-        PhiTemp[which(PhiTemp == 0)] <- stats::rbinom(1,1,indPhi)
-        if(PhiSign == "random"){
-          random.sign <- sample(c(0,1), size=1)
-          if(random.sign==0) {PhiTemp[which(PhiTemp == 1)] <- -stats::rnorm(1, PhiMean, 0.3)}
-          if(random.sign==1) {PhiTemp[which(PhiTemp == 1)] <- stats::rnorm(1,PhiMean, 0.3)}
+      
+      
+      if(indA>0){
+        n.col.a <- ncol(ATemp)
+        n.row.a <- nrow(ATemp)
+        
+        # Loop over individual elements
+        for(i in 1:n.col.a){
+          for(j in 1:n.row.a){
+            if(ATemp[i,j] == 0){
+              ATemp[i,j] <- stats::rbinom(1, 1, indA)
+            }
+            if(ATemp[i,j] == 1){
+              if(ASign == "random"){
+                random.sign <- sample(c(0,1), size=1)
+                if(random.sign==0) {ATemp[i,j] <- -stats::rnorm(1, AMean, 0.3)}
+                if(random.sign==1) {ATemp[i,j] <- stats::rnorm(1, AMean, 0.3)}
+              }
+              if(ASign == "neg")
+                ATemp[i,j] <- -stats::rnorm(1, AMean, 0.3)
+              if(ASign == "pos")
+                ATemp[i,j] <- stats::rnorm(1, AMean, 0.3)
+            }  
+          }
         }
-        if(PhiSign == "neg")
-          PhiTemp[which(PhiTemp == 1)] <- -stats::rnorm(1, 0, 0.3)  # BS: added 2nd argument
-        if(PhiSign == "pos")
-          PhiTemp[which(PhiTemp == 1)] <- stats::rnorm(1, 0, 0.3)   # BS: added 2nd argument
+      }
+        diag(ATemp) <- 0
+      
+        
+      if(indPhi>0){
+        n.col.phi <- ncol(ATemp)
+        n.row.phi <- nrow(ATemp)
+        
+        # Loop over individual elements
+        for(i in 1:n.col.phi){
+          for(j in 1:n.row.phi){
+            if(PhiTemp[i,j] == 0){
+              PhiTemp[i,j] <- stats::rbinom(1, 1, indPhi)
+            }
+            if(PhiTemp[i,j] == 1){
+              if(PhiSign == "random"){
+                random.sign <- sample(c(0,1), size=1)
+                if(random.sign==0) {PhiTemp[i,j] <- -stats::rnorm(1, PhiMean, 0.3)}
+                if(random.sign==1) {PhiTemp[i,j] <- stats::rnorm(1, PhiMean, 0.3)}
+              }
+              if(PhiSign == "neg")
+                PhiTemp[i,j] <- -stats::rnorm(1, PhiMean, 0.3)
+              if(PhiSign == "pos")
+                PhiTemp[i,j] <- stats::rnorm(1, PhiMean, 0.3)
+            }  
+          }
+        }
       }
       
       if(indPsi>0){
         PsiTemp[which(PsiTemp == 0)] <- stats::rbinom(1,1,indPsi)
         PsiTemp[which(PsiTemp == 1)] <- stats::rnorm(1, PsiMean, 0.3)
       }
+      
+      # BS: Return individual parameter lists
+      indList[[ind]] <- list()
+      # indList[[ind]]$AInd <- ATemp
+      # indList[[ind]]$PhiInd <- PhiTemp
+      indList[[ind]]$PsiInd <- PsiTemp
+      indList[[ind]]$Paths <- cbind(PhiTemp, ATemp)
+      # combine into path counts matrix
+      indList[[ind]]$Adj <- as.matrix(ifelse(cbind(PhiTemp, ATemp) != 0, 1, 0))
       
       negA <- solve(diag(vars)-ATemp) 
       
@@ -412,7 +454,8 @@ simulateVARtest <- function(A         = NULL,
               Phi = PhiList, 
               Psi = PsiList, 
               dataList = dataList, 
-              subAssign = subAssign))
+              subAssign = subAssign,
+              indList = indList))
   
 }
 
