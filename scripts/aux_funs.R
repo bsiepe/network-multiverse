@@ -373,6 +373,7 @@ simulateVARtest <- function(A         = NULL,
       time1 <- matrix(0, nrow = vars, ncol = Obs+400)
       
       noise <- negA %*% t(MASS::mvrnorm(n = (Obs+400),rep(0,vars),PsiTemp, empirical = TRUE))
+      # BS: this throws an non-conformable error if PsiTemp is not properly defined
       
       time[,1] <- noise[,1]
       
@@ -387,10 +388,12 @@ simulateVARtest <- function(A         = NULL,
       }
       go <- 0
       for (c in 1:length(time[,1])){
-        adf_result <- tryCatch({aTSA::adf.test(time[c, ], out = FALSE)}, 
-                               error = function(e) NA)       # BS: changed this
-        if(aTSA::adf.test(time[c,], out = FALSE)$type3[1,3]>0.05 || 
-           is.na(aTSA::adf.test(time[c,], out = FALSE)$type3[1,3]))
+        adf_result <- suppressWarnings(tryCatch({aTSA::adf.test(time[c, ], out = FALSE)},
+                               error = function(e) NA))       # BS: changed this
+        if(adf_result$type3[1,3]>0.05 || 
+           is.na(adf_result$type3[1,3])
+           ||
+           sum(abs(time[c, 400:(Obs+400)])) > 10000)    # BS: add check for large values of timeseries
           go <- go + 1
         counter <- sum(counter, 1)
       }
