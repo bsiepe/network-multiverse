@@ -14,6 +14,8 @@ Load all relevant packages:
 library(mvgimme)       # fork of gimmme package that allows multiverse
 library(tidyverse)     # data handling
 library(here)          # reproducible folder settings
+library(tictoc)
+source("aux_funs.R")
 set.seed(35037)
 ```
 
@@ -58,6 +60,30 @@ multiverse_grid <- expand.grid(
 
 ## Personality Dataset
 ```{r multiverse-personality}
+# for testing
+data_list <- readRDS(here("data/wright_2019/data_list.RDS"))
+tic()
+mv_res_pers <- mvgimme::multiverse.gimme(data = here("data/wright_2019/individual_files"),
+                                         sep = ",",
+                                         header = TRUE,
+                          groupcutoffs = group_cuts, 
+                          subcutoffs = sub_cuts,
+                          rmsea.cuts = rmsea_cuts,
+                          srmr.cuts = srmr_cuts,
+                          nnfi.cuts = nnfi_cuts,
+                          cfi.cuts = cfi_cuts,
+                          n.excellent = n_excels,
+                          n.cores = 60,
+                          prune_output = TRUE,
+                          save_output = TRUE)
+toc()
+
+# even more testing
+
+
+
+
+
 mv_res_pers <- mvgimme::multiverse.gimme(data = "data/wright_2019/individual_files",
                           groupcutoffs = c(.50, .60, .75, .80), 
                           subcutoffs = c(.50, .60, .75, .80),
@@ -66,10 +92,11 @@ mv_res_pers <- mvgimme::multiverse.gimme(data = "data/wright_2019/individual_fil
                           nnfi.cuts = c(.90, .95, .97),
                           cfi.cuts = c(.90, .95, .97),
                           n.excellent = c(1, 2, 3),
-                          n.cores = 1,
+                          n.cores = 60,
                           prune_output = TRUE,
                           save_output = TRUE, 
                           save_dir = "output/mv_personality")
+saveRDS(mv_res_pers, file = here("output/mv_personality/mv_res_pers.RDS"))
 
 ```
 
