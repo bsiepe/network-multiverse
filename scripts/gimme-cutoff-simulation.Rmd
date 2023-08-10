@@ -33,23 +33,66 @@ Maybe also different sparsity levels?
 # sample_sizes <- c(50, 100, 200)
 # For testing only:
 sample_sizes <- c(20)
-# ts_lengths <- c(50, 100, 200)
-ts_lengths <- c(50, 100)
-# densities <- c(.2, .4)
-densities <- c(.2)
-replications <- 1000
+ar <- c(.2)
+ind_a <- c(.15)
+ind_phi <- c(.05)
+replications <- 500
 
 sim_design <- SimDesign::createDesign(sample_size = sample_sizes,
-                                  ts_length = ts_lengths,
-                                  densities = densities)
+                                      ar = ar,
+                                      ind_a = ind_a,
+                                      ind_phi = ind_phi)
+
+
+# TODO double check if this works with change_phi and change_a
+a_1 <- matrix(c(
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.25, 0.40, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.15,
+  0.00, 0.00, 0.35, 0.00, 0.00, 0.00
+), nrow = 6, byrow = TRUE)
+
+change_a <- matrix(c(
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0, -0.01010176, -0.06727818, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.20420106,  0.00000000, 0, -0.04994893,
+  0, 0, -0.35000000,  0.00000000, 0,  0.00000000
+), nrow = 6, byrow = TRUE)
+
+phi_1 <- matrix(c(
+  ar, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, ar, 0.00, 0.00, 0.10, 0.00,
+  0.00, 0.00, ar, 0.00, 0.00, 0.20,
+  0.00, 0.00, 0.00, ar, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, ar, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, ar
+), nrow = 6, byrow = TRUE)
+change_phi <- matrix(c(
+  0.0299806, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.00000000,
+  0.0000000, 0.1384933, 0.0000000,  0.00000000,  0.2270527,  0.00000000,
+  0.0000000, 0.0000000, 0.2266066,  0.00000000,  0.0000000, -0.02793758,
+  0.0000000, 0.0000000, 0.0000000, -0.06865572,  0.0000000,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000, -0.1298429,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.05377093
+), nrow = 6, byrow = TRUE)
+phi_2 <- phi_1 + change_phi
+phi_list <- list(phi_1, phi_2)
+
+psi_mat <- matrix(data = rep(0, 36), nrow = 6, ncol = 6)
+diag(psi_mat) <- rep(1, 6)
+psi_list <- list(psi_mat, psi_mat)
+
 
 sim_pars <- list(
-  p.con = .50, 
-  nvar = 6, 
-  AR =.3,
-  p.group = .50,
-  con.b = .6,
-  lag.b = -.3
+  t = 100,
+  phi_list = phi_list,
+  a_1 = a_1,
+  psi_list = psi_list,
+  change_a = change_a
 )
 
 ```
@@ -57,30 +100,6 @@ sim_pars <- list(
 
 
 # Data Generation
-```{r true-dgp}
-# test_mat <- mat.generate.asw(p.con = .50,
-#                  nvar = 6, AR=.3,
-#                  p.group = .50,dens = .20,
-#                  con.b = .6,lag.b = -.3)
-# out <- ts.generate.asw(mat = test_mat$sub1,
-#                              lvl = test_mat$lvl1,
-#                              t   = 100,
-#                              p.group = .50,dens = .20,
-#                              con.b = .6,lag.b = -.3,
-#                              p.con = .50)
-
-# res <- sim.gimme(p.con = .50,
-#                  nvar = 6, AR=.3,
-#                  p.group = .50,dens = .20,
-#                  con.b = .6,lag.b = -.3,
-#                  n.ind = 20, t = 100)
-
-
-
-```
-
-Use functions from here: 
-https://github.com/aweigard/GIMME_AR_simulations/tree/master
 
 Then, create data-generation function to sample from this model, using `gimme`.
 ```{r data-generation}
@@ -91,21 +110,26 @@ sim_generate <- function(condition,
   
   # obtain condition parameters
   n <- condition$sample_size
-  t <- condition$ts_length
-  d <- condition$densities
+  group_ind <- c(rep(1, (n/2)), rep(2, (n/2)))
+  ar <- condition$ar
+  ind_a <- condition$ind_a
+  ind_phi <- condition$ind_phi
   
-    sim_dat <- try(sim.gimme(
-                   p.con = p.con, 
-                   nvar = nvar,
-                   AR = AR,
-                   dens = d,
-                   p.group = p.group,
-                   con.b = con.b,
-                   lag.b = lag.b,
-                   mat = mat, 
-                   lvl = lvl,          
-                   t = t,              
-                   n.ind = n))
+  # Create matrix list depending on AR effect
+  # TODO check if I have to provide this as fixed object
+  diag(a_1) <- rep(ar, 6)
+  a_2 <- a_1 + change_a
+  a_list <- list(a_1, a_2)
+  
+    sim_dat <- try(simulateVARtest(
+                                   A = a_list, 
+                                   Phi = phi_list,
+                                   Psi = psi_list,
+                                   subAssign = group_ind,
+                                   N = n,
+                                   Obs = t,
+                                   indA = ind_a,
+                                   indPhi = ind_phi))
   if(is(sim_dat, 'try-error')) browser()
   
   # save dgp
@@ -113,25 +137,79 @@ sim_generate <- function(condition,
                                    ".RDS"))
   
   # list of data matrices
-  l_dat <- lapply(sim_dat, function(x){
-    as.matrix(x$series, ncol = nvar)
+  l_dat <- lapply(sim_dat$dataList, function(x){
+    as.matrix(x, ncol = nvar)
   })
   
   # list of edge weights
-  l_paths <- lapply(sim_dat, function(x){
-    x$paths
+  l_paths <- lapply(sim_dat$indList, function(x){
+    x$Paths
   })
   
   # overall counts matrix
-  l_counts <- lapply(sim_dat, function(x){
-    ifelse(x$paths != 0, 1, 0)
+  l_counts <- lapply(sim_dat$indList, function(x){
+    x$Adj
   })
   path_counts <- Reduce('+', l_counts)
   
   
-  dat <- list(dat = l_dat, ind_paths = l_paths, path_counts = path_counts)
+  dat <- list(dat = l_dat, 
+              ind_paths = l_paths, 
+              path_counts = path_counts, 
+              group_ind = group_ind)
   # levels = sim_dat$levels))
 }
+
+
+# sim_generate_old <- function(condition, 
+#                          fixed_objects = NULL){
+#   # obtain fixed parameters
+#   SimDesign::Attach(fixed_objects)
+#   
+#   # obtain condition parameters
+#   n <- condition$sample_size
+#   t <- condition$ts_length
+#   d <- condition$densities
+#   
+#     sim_dat <- try(sim.gimme(
+#                    p.con = p.con, 
+#                    nvar = nvar,
+#                    AR = AR,
+#                    dens = d,
+#                    p.group = p.group,
+#                    con.b = con.b,
+#                    lag.b = lag.b,
+#                    mat = mat, 
+#                    lvl = lvl,          
+#                    t = t,              
+#                    n.ind = n))
+#   if(is(sim_dat, 'try-error')) browser()
+#   
+#   # save dgp
+#   saveRDS(sim_dat, file = paste0("output/sim_dat_", n, "_", t,
+#                                    ".RDS"))
+#   
+#   # list of data matrices
+#   l_dat <- lapply(sim_dat, function(x){
+#     as.matrix(x$series, ncol = nvar)
+#   })
+#   
+#   # list of edge weights
+#   l_paths <- lapply(sim_dat, function(x){
+#     x$paths
+#   })
+#   
+#   # overall counts matrix
+#   l_counts <- lapply(sim_dat, function(x){
+#     ifelse(x$paths != 0, 1, 0)
+#   })
+#   path_counts <- Reduce('+', l_counts)
+#   
+#   
+#   dat <- list(dat = l_dat, ind_paths = l_paths, path_counts = path_counts)
+#   # levels = sim_dat$levels))
+# }
+
 ```
 
 
@@ -148,18 +226,21 @@ sim_analyse_gimme_default <- function(condition, dat, fixed_objects = NULL){
   # save dgp parameters for later
   dgp_ind_paths <- dat$ind_paths
   dgp_path_counts <- dat$path_counts
+  dgp_sub_ind <- dat$group_ind
   
   gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
                  subgroup = TRUE,
                  groupcutoff = .75,
                  subcutoff   = .75))
-  if(is(gimme_res, 'try-error')) browser()
+  # if(is(gimme_res, 'try-error')) browser()
   
   ret <- list(path_counts = gimme_res[[1]]$path_counts,
               path_est_mats = gimme_res[[1]]$path_est_mats,
+              sub_ind = gimme_res[[1]]$fit$sub_membership,
               dgp_path_counts = dgp_path_counts,
-              dgp_ind_paths = dgp_ind_paths)
+              dgp_ind_paths = dgp_ind_paths,
+              dgp_sub_ind = dgp_sub_ind)
   ret
 }
 
@@ -168,18 +249,27 @@ sim_analyse_gimme_liberal <- function(condition, dat, fixed_objects = NULL){
   # obtain fixed objects
   Attach(fixed_objects)
   
-  # 
+  # save dgp parameters for later
+  dgp_ind_paths <- dat$ind_paths
+  dgp_path_counts <- dat$path_counts
+  dgp_sub_ind <- dat$group_ind
   
-  ret <- multiverse.gimme(data = dat$dat,
+  gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
-                 plot = FALSE,
                  subgroup = TRUE,
                  groupcutoff = .75,
                  subcutoff   = .75,
                  rmsea.cuts = .08,
-                 srms.cuts = .08,
+                 srmr.cuts = .08,
                  nnfi.cuts = .90,
-                 cfi.cuts = .90)
+                 cfi.cuts = .90))
+  
+    ret <- list(path_counts = gimme_res[[1]]$path_counts,
+              path_est_mats = gimme_res[[1]]$path_est_mats,
+              sub_ind = gimme_res[[1]]$fit$sub_membership,
+              dgp_path_counts = dgp_path_counts,
+              dgp_ind_paths = dgp_ind_paths,
+              dgp_sub_ind = dgp_sub_ind)
   ret
   
 }
@@ -189,19 +279,27 @@ sim_analyse_gimme_strict <- function(condition, dat, fixed_objects = NULL){
   # obtain fixed objects
   Attach(fixed_objects)
   
-  # 
+  # save dgp parameters for later
+  dgp_ind_paths <- dat$ind_paths
+  dgp_path_counts <- dat$path_counts
+  dgp_sub_ind <- dat$group_ind
   
-  ret <- multiverse.gimme(data = dat$dat,
+  gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
-                 plot = FALSE,
                  subgroup = TRUE,
                  groupcutoff = .75,
                  subcutoff   = .75,
                  rmsea.cuts = .03,
-                 srms.cuts = .03,
+                 srmr.cuts = .03,
                  nnfi.cuts = .97,
                  cfi.cuts = .97
-                 )
+                 ))
+  ret <- list(path_counts = gimme_res[[1]]$path_counts,
+              path_est_mats = gimme_res[[1]]$path_est_mats,
+              sub_ind = gimme_res[[1]]$fit$sub_membership,
+              dgp_path_counts = dgp_path_counts,
+              dgp_ind_paths = dgp_ind_paths,
+              dgp_sub_ind = dgp_sub_ind)
   ret
   
 }
@@ -211,16 +309,26 @@ sim_analyse_gimme_threshold1 <- function(condition, dat, fixed_objects = NULL){
   # obtain fixed objects
   Attach(fixed_objects)
   
-  # 
+  # save dgp parameters for later
+  dgp_ind_paths <- dat$ind_paths
+  dgp_path_counts <- dat$path_counts
+  dgp_sub_ind <- dat$group_ind
   
-  ret <- multiverse.gimme(data = dat$dat,
+  gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
-                 plot = FALSE,
                  subgroup = TRUE,
                  groupcutoff = .75,
                  subcutoff   = .75,
-                 n.excellent = 1)
+                 n.excellent = 1))
+  
+  ret <- list(path_counts = gimme_res[[1]]$path_counts,
+              path_est_mats = gimme_res[[1]]$path_est_mats,
+              sub_ind = gimme_res[[1]]$fit$sub_membership,
+              dgp_path_counts = dgp_path_counts,
+              dgp_ind_paths = dgp_ind_paths,
+              dgp_sub_ind = dgp_sub_ind)
   ret
+  
   
 }
 
@@ -232,70 +340,184 @@ sim_analyse_gimme_threshold1 <- function(condition, dat, fixed_objects = NULL){
 
 # Summary function
 
+
+Helpers:
+```{r}
+#--- Compute Precision
+precision <- function(true, est){
+  # true paths relative to all paths
+  true_pos <- sum(true & est)
+  all_pos <- sum(est)
+  
+  if (all_pos == 0) {
+    return(0)
+  } else {
+    precision <- true_pos / all_pos
+    return(precision)
+  }
+}
+
+#--- Compute Recall
+recall <- function(true, est) {
+  true_pos <- sum(true & est)
+  all_true <- sum(true)
+  
+  if (all_true == 0) {
+    return(0)
+  } else {
+    recall <- true_pos / all_true
+    return(recall)
+  }
+}
+
+
+
+
+#--- Nondirected Adjacency matrix
+nondirect_adjacency <- function(adj_mat) {
+  # Number of ariables
+  n_adj_vars <- nrow(adj_mat)
+  
+  # Initialize symmetrical matrix with 0s
+  sym_matrix <- matrix(0, nrow = n_adj_vars, ncol = n_adj_vars)
+  
+  # Iterate through each cell of the original matrix
+  for (i in 1:n_adj_vars) {
+    for (j in 1:n_adj_vars) {
+      # If there is any effect (1) in either direction, update the symmetrical matrix
+      if (n_adj_vars[i, j] == 1 || n_adj_vars[j, i] == 1) {
+        sym_matrix[i, j] <- 1
+        sym_matrix[j, i] <- 1
+      }
+    }
+  }
+
+  return(sym_matrix)
+}
+
+
+abs_mean <- function(x){
+  mean(abs(x))
+}
+abs_med <- function(x){
+  stats::median(abs(x))
+}
+
+abs_sum <- function(x){
+  sum(abs(x))
+}
+```
+
+
+
+
 This is relevant here: http://philchalmers.github.io/SimDesign/html/04-Auxillary_parameter_recovery.html
 
 ```{r summary-function}
 sim_summarize <- function(condition, results, fixed_objects = NULL){
+
   
-  # # load dgp from csv
-  # dgp_filename <- list.files("output/", pattern = condition)
-  # dgp <- read.csv(dgp_filename[[1]])
-  # 
-  # # compute adjacency matrix true dgp
-  # true_dgp <- list()
-  # for(i in 1:length(dgp)){
-  #   true_dgp[[i]] <- list()
-  #   true_dgp[[i]]$path_counts <- ifelse(dgp[[i]]$paths != 0, 1, 0)
-  # }
-  # 
-  # 
-  # # summarize information of dgp
-  # 
-  # 
-  # # Analyze difference in counts matrix
-  # diff_count <- sum(results$path_counts - true_dgp$path_counts)
-  
-  # Analyze bias across all individual networks
+  ret <- list()
+  #---- Loop over different analysis fns -----
+  for(m in 1:length(results[[1]])){
+    
   
   
-  # For testing, compute some useless stat
-  # n_paths <- try(sum(results$path_counts))
-  View(results)
-  index <- 1:length(results)
+  #----- Subgroup ------
+  ari_sub <- lapply(seq_along(results[[m]]), function(i){
+    
+    if(is.null(results[[m]][[i]]$sub_ind)){
+      NULL
+    } 
+    else{
+      perturbR:::arandi(results[[m]][[i]]$dgp_sub_ind, results[[m]][[i]]$sub_ind)
+    }
+    
+  })
   
-  n_paths <- try(lapply(seq_along(results), function(i){
-    sum(results[[i]]$path_counts)
-  }))
   
-  if(is(n_paths, 'try-error')) browser()
+  
+  #----- Individual -----
   
   # Compare overall path counts
   diff_path_counts <- lapply(seq_along(results), function(i){
-    sum(results[[i]]$dgp_path_counts - results[[i]]$path_counts)
+    sum(results[[i]][[m]]$dgp_path_counts - results[[i]][[m]]$path_counts)
   })
   
   # Compute bias
   bias_paths <- lapply(seq_along(results), function(i){
-     l_diff <- Map('-', results[[i]]$dgp_ind_paths, results[[i]]$path_est_mats)
+     l_diff <- Map('-', results[[i]][[m]]$dgp_ind_paths, results[[i]][[m]]$path_est_mats)
      lapply(l_diff, function(y){as.matrix(y)})
   })
   
+  # Precision
+  precision_directed <- lapply(seq_along(results), function(i){
+    precision(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts)
+  })
+  
+  # Recall
+  recall_directed <- lapply(seq_along(results), function(i){
+    recall(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts)
+  })
+  
+  
+  #----- Aggregate -----
+  diff_path_counts_mean <- mean(unlist(diff_path_counts))
+  diff_path_counts_sd <- sd(unlist(diff_path_counts))
+  
+  # Aggregate ARI
+  ari_mean <- mean(unlist(ari_sub))
+  ari_sd <- sd(unlist(ari_sub))
+  
+  
+  # Recall and Precision
+  precision_directed_mean <- mean(unlist(precision_directed))
+  precision_directed_mcse <- sqrt((precision_directed_mean*(1-precision_directed_mean)) / replications)
+  recall_directed_mean <- mean(unlist(precision_directed))
+  recall_directed_mcse <- sqrt((recall_directed_mean*(1-recall_directed_mean)) / replications)
+  
+  
   # Aggregate bias
-  mean_diff_ests <- lapply(bias_paths, function(x){
+  mean_bias_ests <- lapply(bias_paths, function(x){
     l_tmp <- list()
     mean_mat <- apply(simplify2array(x), 1:2, mean)
     l_tmp$mean_nonzero_diff <- mean(abs(mean_mat[mean_mat != 0]))
+    l_tmp$var_nonzero_diff <- var(abs(mean_mat[mean_mat != 0]))
     l_tmp$mean_diff <- mean(abs(mean_mat))
+    l_tmp$var_diff <- var(abs(mean_mat))
     return(l_tmp)
   })
   
+  # for MCSE formulas, see Morris et al. 2019 SIM
+  bias_nonzero_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_nonzero_diff))
+  bias_nonzero_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_nonzero_diff)) / (replications * (replications - 1)))
+  bias_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_diff))
+  bias_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_diff)) / (replications * (replications - 1)))
+  
+  
   # Output
-  ret <- c(n_paths = n_paths, 
+  ret_mod <- c(ari_mean = ari_mean,
+           ari_sd = ari_sd,
+           precision_directed_mean = precision_directed_mean,
+           recall_directed_mean = recall_directed_mean,
            diff_path_counts = diff_path_counts,
-           mean_diff = mean_diff_ests)
+           bias_nonzero_mean = bias_nonzero_mean,
+           bias_nonzero_mcse = bias_nonzero_mcse,
+           bias_mean = bias_mean,
+           bias_mcse = bias_mcse
+           )
+  ret_mod <- unlist(ret_mod)
+  ret[[m]] <- ret_mod
+  
+  # names(ret)[m] <- names(results[[1]])[m]
+  # Add model name
+  # names(ret[[m]]) <- paste0(names(ret[[m]]), names(results[[1]])[m])
+  
+  }
+  
+
   ret <- unlist(ret)
   return(ret)
-  
 }
 ```
 
@@ -309,12 +531,13 @@ sim_res <- SimDesign::runSimulation(sim_design,
                                     replications = 2, 
                                     save_results = TRUE,
                                     generate = sim_generate, 
-                                    # analyse = list(
-                                    #     gimme = sim_analyse_gimme_default, 
-                                    #     liberal = sim_analyse_gimme_liberal,
-                                    #     strict = sim_analyse_gimme_strict,
-                                    #     threshold = sim_analyse_gimme_threshold1), 
-                                    analyse = sim_analyse_gimme_default,
+                                    analyse = list(
+                                    gimme = sim_analyse_gimme_default,
+                                    liberal = sim_analyse_gimme_liberal,
+                                    strict = sim_analyse_gimme_strict
+                                    # thresh = sim_analyse_gimme_threshold1
+                                    ),
+                                    # analyse = sim_analyse_gimme_liberal,
                                     summarise = sim_summarize, 
                                     # save = TRUE, 
                                     # save_seeds = TRUE,
@@ -325,8 +548,6 @@ sim_res <- SimDesign::runSimulation(sim_design,
 ```
 
 
-
-# Evaluation
 
 
 
