@@ -4,9 +4,10 @@ author: "Björn Siepe"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+
 This document repeats the preprocessing and modeling steps by Kullar et al. (2023), as outlined in the corresponding [GitHub Repo](https://github.com/mkullar/DataDrivenEmotionDynamics/blob/main/DataDrivenEmotionDynamics_Code.Rmd)
 
-We omit the confirmatory subgrouping here and modify some of the code in order to suit our purpose. 
+We omit the confirmatory subgrouping here and modify some of the code in order to suit our purpose.
 
 ```{r kullar-packages}
 # packages used
@@ -24,7 +25,6 @@ library(here)
 
 set.seed(35037)
 ```
-
 
 # Pre-processing ESM data
 
@@ -102,6 +102,7 @@ for(i in levels(datadetrend$moniker)) {
 ```
 
 # Data-driven groups GIMME analysis
+
 ```{r}
 ##################################
 ##     S-GIMME, DATA-DRIVEN     ##
@@ -126,11 +127,10 @@ sgimmefit <- readRDS("data/kullar_2023/kullar_2023_fit.RDS")
 
 ```
 
-
-
-
 # Summarize GIMME
-Obtain some individual level summaries: 
+
+Obtain some individual level summaries:
+
 ```{r summarize-gimme}
 # Indicator for temporal and contemporaneous network
 n_vars <- sgimmefit$n_vars_total
@@ -158,6 +158,3 @@ table(unlist(max_temp))
 table(unlist(max_cont))
 
 ```
-
-
-
