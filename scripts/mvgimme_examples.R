@@ -1,6 +1,7 @@
 library(tidyverse)
 library(mvgimme)
 library(cowplot)
+library(tictoc)
 source("scripts/aux_funs.R")
 set.seed(35037)
 
@@ -27,6 +28,12 @@ mv_res <- readRDS("mv_res.RDS")
 ref_fit <- readRDS("ref_fit.RDS")
 
 
+# Create longer mv_res for testing
+# Create an empty list to store the duplicated elements
+mv_long <- list()
+
+# Loop through each element in the initial list
+mv_long <- c(rep(mv_res, 100))
 
 test_combs <- expand.grid(
   groupcutoffs = c(.5, .6, .7),
@@ -39,8 +46,11 @@ test_combs <- expand.grid(
 )
 
 
-test_all <- multiverse.compare(l_res = mv_res, 
+tic()
+test_all <- multiverse.compare(l_res = mv_long, 
                                ref_model = ref_fit)
+toc()
+
 
 test_group <- multiverse.compare.group(l_res = mv_res,
                                  ref_model = ref_fit)
@@ -113,6 +123,17 @@ a_2[5,3] <- a_2[6,3]
 a_2[6,3] <- 0
 nonzero <- which(a_2 != 0)
 a_2[nonzero] <- a_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .1)
+a_2 
+
+# Create a fixed change matrix
+change_a <- matrix(c(
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0, -0.01010176, -0.06727818, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.20420106,  0.00000000, 0, -0.04994893,
+  0, 0, -0.35000000,  0.00000000, 0,  0.00000000
+), nrow = 6, byrow = TRUE)
 
 a_list <- list(a_1, a_2)
 
@@ -125,9 +146,22 @@ phi_2[6,1] <- 0
 nonzero <- which(phi_2 != 0)
 phi_2[nonzero] <- phi_2[nonzero] + rnorm(length(nonzero), mean = 0, sd = .1)
 
+# Create a fixed change matrix
+phi_2 - phi_1
+change_phi <- matrix(c(
+  0.0299806, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.00000000,
+  0.0000000, 0.1384933, 0.0000000,  0.00000000,  0.2270527,  0.00000000,
+  0.0000000, 0.0000000, 0.2266066,  0.00000000,  0.0000000, -0.02793758,
+  0.0000000, 0.0000000, 0.0000000, -0.06865572,  0.0000000,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000, -0.1298429,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.05377093
+), nrow = 6, byrow = TRUE)
+
+
+
 phi_list <- list(phi_1, phi_2)
 
-group_ind <- c(rep(1, 15), rep(2, 15))
+group_ind <- c(rep(1, 20), rep(2, 20))
 n_ind <- length(group_ind)
 n_tp <- 100
 
@@ -139,8 +173,8 @@ data_sub <- simulateVARtest(A = a_list,
                                     subAssign = group_ind,
                                     N = n_ind,
                                     Obs = n_tp,
-                            indA = 0.3,
-                            indPhi = 0.1)
+                                    indA = 0.3,
+                                    indPhi = 0.3)
 
 
 # Test fitting a model on it
@@ -286,12 +320,17 @@ plot_specification <- function(mv_res,
 
 # for testing
 df_mv_test <- dplyr::slice_sample(df_mv, n = 400)
+test_new <- dplyr::slice_sample(test, n = 500)
 
 test_out <- plot_outcome(mv_res = df_mv, var = heterogeneity_g)
 # test_out
+test_out <- plot_outcome(mv_res = test_new, var = mean_diff_dens_temp_i) 
+
 
 test_spec <- plot_specification(mv_res = df_mv, var = heterogeneity_g)
 # test_spec
+test_spec <- plot_specification(mv_res = test_new, var = mean_diff_dens_temp_i)
+
 # ggsave("test.svg", test_spec, device = "svg", height = 11, width = 11)
 
 
@@ -299,7 +338,7 @@ test_spec <- plot_specification(mv_res = df_mv, var = heterogeneity_g)
 comb_plot <- cowplot::plot_grid(test_out, test_spec, 
                    nrow = 2, align = "h",
                    rel_heights = c(0.5,1))
-ggsave("comb_plot.svg", comb_plot, device = "svg", height = 11, width = 11)
+ggsave("comb_plot.svg", comb_plot, device = "svg", height = 16, width = 16)
 
 
 # Subgroup-Level ----------------------------------------------------------
@@ -321,6 +360,13 @@ ggsave("comb_plot.svg", comb_plot, device = "svg", height = 11, width = 11)
 
 
 # difference in fit measures
+
+
+# Difference in most central edge
+# Could do lollipop plot, two facets
+# edge in reference model colored 
+
+
 
 
 
