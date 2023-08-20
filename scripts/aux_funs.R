@@ -699,7 +699,7 @@ multiverse.compare.group <- function(l_res,
   
   #--- Reference model info
   # TODO this will have to account for nonconvergence
-  n_ind <- length(ref_model$data)
+  n_ind <- length(ref_model$fit)
   n_var <- ref_model$n_vars_total
   
   # indices for temporal and contemporaneous
