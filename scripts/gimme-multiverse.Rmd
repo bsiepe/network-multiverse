@@ -14,8 +14,9 @@ Load all relevant packages:
 library(mvgimme)       # fork of gimmme package that allows multiverse
 library(tidyverse)     # data handling
 library(here)          # reproducible folder settings
-library(tictoc)
-source("aux_funs.R")
+library(tictoc)        # timing
+library(RColorBrewer)  # color palette
+source("scripts/aux_funs.R")
 set.seed(35037)
 ```
 
@@ -66,6 +67,8 @@ tic()
 mv_res_pers <- mvgimme::multiverse.gimme(data = here("data/wright_2019/individual_files"),
                                          sep = ",",
                                          header = TRUE,
+                                         subgroup = TRUE,
+                                         ar = TRUE,
                           groupcutoffs = group_cuts, 
                           subcutoffs = sub_cuts,
                           rmsea.cuts = rmsea_cuts,
@@ -78,25 +81,37 @@ mv_res_pers <- mvgimme::multiverse.gimme(data = here("data/wright_2019/individua
                           save_output = TRUE)
 toc()
 
-# even more testing
-
-
-
-
-
-mv_res_pers <- mvgimme::multiverse.gimme(data = "data/wright_2019/individual_files",
-                          groupcutoffs = c(.50, .60, .75, .80), 
-                          subcutoffs = c(.50, .60, .75, .80),
-                          rmsea.cuts = c(.03, .05, .08),
-                          srmr.cuts = c(.03, .05, .08),
-                          nnfi.cuts = c(.90, .95, .97),
-                          cfi.cuts = c(.90, .95, .97),
-                          n.excellent = c(1, 2, 3),
-                          n.cores = 60,
-                          prune_output = TRUE,
-                          save_output = TRUE, 
-                          save_dir = "output/mv_personality")
 saveRDS(mv_res_pers, file = here("output/mv_personality/mv_res_pers.RDS"))
+mv_res_pers <- readRDS(here("output/mv_personality/mv_res_pers2.RDS"))
+
+```
+
+
+Sanity checks: compare GIMME results to mvgimme
+```{r}
+g_50_50 <- gimme::gimme(data = here("data/wright_2019/individual_files"),
+                                         sep = ",",
+                                         header = TRUE,
+                                         subgroup = TRUE,
+                                         ar = TRUE,
+                          groupcutoff = .50, 
+                          subcutoff = .50)
+
+g_50_75 <- gimme::gimme(data = here("data/wright_2019/individual_files"),
+                                         sep = ",",
+                                         header = TRUE,
+                                         subgroup = TRUE,
+                                         ar = TRUE,
+                          groupcutoff = .50, 
+                          subcutoff = .75)
+
+g_80_50 <- gimme::gimme(data = here("data/wright_2019/individual_files"),
+                                         sep = ",",
+                                         header = TRUE,
+                                         subgroup = TRUE,
+                                         ar = TRUE,
+                          groupcutoff = .80, 
+                          subcutoff = .50)
 
 ```
 
@@ -117,29 +132,164 @@ mv_res_emot <- mvgimme::multiverse.gimme(data = "data/kullar_2023/finaloutput",
                           prune_output = TRUE,
                           save_output = TRUE, 
                           save_dir = "output/mv_emotion")
+
+
+# todo change output directory to correct dir
+# fst::write_fst(mv_res_pers, path = here::here("output/mv_emotion/"))
+
+
 ```
 
 
 # Analyze multiverse
 
 ## Personality Dataset
-Delete reference fit from multiverse dataset:
+Delete reference fit from multiverse dataset.
 ```{r}
-mv_res_pers <- subset(mv_res_pers, !(group_cuts == .75 &
-                        sub_cuts == .75 &
-                        rsmea_cuts == .05 &
-                        srms_cuts == .05 &
+ref_fit_ind <- multiverse_grid %>% 
+  mutate(spec = dplyr::row_number()) %>% 
+  filter(group_cuts == .75 &
+                        sub_cuts == .50 &
+                        rmsea_cuts == .05 &
+                        srmr_cuts == .05 &
                         nnfi_cuts == .95 &
                         cfi_cuts == .95 &
-                        n_excels == 2))
+                        n_excels == 2) %>% 
+  pull(spec)
+
+ref_fit_pers <- mv_res_pers[[ref_fit_ind]]
+mv_res_pers <- mv_res_pers[-ref_fit_ind]
+
+
+comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers, n_ind = 94)
+saveRDS(comp_pers, here("output/mv_personality/comp_pers.RDS"))
+```
+
+
+### Summary statistics
+#### Group-Level
+Nonconvergence:
+```{r}
+summary(sapply(mv_res_pers, function(y){
+  sum(unlist(lapply(y$path_est_mats, function(x) is.logical(x))))
+}))
+
+
+```
+
+
+Number of group-level edges:
+```{r}
+# subtract the 6 AR paths
+n_group_paths <- sapply(comp_pers$adjacency_g, function(x) sum(unlist(x))) - 6
+summary(n_group_paths)
+prop.table(table(n_group_paths))
+```
+Which group-level paths were found most often?
+```{r}
+Reduce('+', comp_pers$adjacency_g)
+```
+
+Heterogeneity of the solution
+```{r}
+summary(unlist(comp_pers$heterogeneity_g))
+```
+
+
+
+#### Subgroup-Level
+Number and size of subgruops
+```{r}
+summary(unlist(comp_pers$n_sub_g))
+table(unlist(comp_pers$size_sub_s))
+```
+
+
+#### Individual-Level
+Adjacency matrix differences, summed across all individuals within a specification.
+TODO account for absolute differences. 
+```{r}
+comp_pers$sum_adj_diff <- lapply(comp_pers$l_diff_adj_i, function(x) sum(Reduce('+', x)))
+sd(abs(unlist(comp_pers$sum_adj_diff)))/94 
+  
+
+# Check if there are individuals for whom there was a greater difference
+# Custom function to add matrices element-wise
+add_matrices <- function(matrix_list) {
+  reduce_matrix <- matrix(0, nrow = nrow(matrix_list[[1]]), ncol = ncol(matrix_list[[1]]))
+  for (matrix in matrix_list) {
+    reduce_matrix <- reduce_matrix + matrix
+  }
+  reduce_matrix
+}
+
+# Use lapply to apply the custom function to each matrix name across all elements
+result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
+  add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]]))
+})
+
+# calculate average difference
+avg_diff_adj <- sapply(result, function(x) sum(abs(x)))/3887
+summary(avg_diff_adj)
+sum(avg_diff_adj > 5)
+
+```
+
+
+Edge weight differences
+```{r}
+
+```
+
+
+
+Identical centrality estimates
+```{r}
+summary(comp_pers$sum_temp_central_identical_i)
+summary(comp_pers$sum_cont_central_identical_i)
+
+# Again, calculate individual differences
+l_temp_ident <- list()
+l_cont_ident <- list()
+for(i in 1:comp_pers$n_ind[[1]]){
+  l_temp_ident[[i]] <- lapply(comp_pers$central_node_identical_i, function(x){
+    x[[i]]$temp_identical
+  })
+  l_cont_ident[[i]] <- lapply(comp_pers$central_node_identical_i, function(x){
+    x[[i]]$cont_identical
+  })
+}
+
+# How often are they identical?
+most_cent_ident_temp <- sapply(l_temp_ident, function(x){sum(unlist(x))})
+sum(most_cent_ident_temp >= 3887)
+
+most_cent_ident_cont <- sapply(l_cont_ident, function(x){sum(unlist(x))})
+sum(most_cent_ident_cont >= 3887)
+
+# identical for both
+sum(most_cent_ident_temp >= 3887 & most_cent_ident_cont >= 3887)
+
+# identical less than one third
+sum(most_cent_ident_temp <= 3887/3)
+sum(most_cent_ident_cont <= 3887/3)
+
+
+```
+
+
+Fit indices
+```{r}
+fit_ind_diff <- do.call(rbind, comp_pers$mean_diff_fit_i)
+mean_fit_ind_diff <- colMeans(fit_ind_diff)
+summary(fit_ind_diff)
 ```
 
 
 
 
-
 ## Emotion Dataset
-Delete reference fit from multiverse dataset:
+Delete reference fit from multiverse dataset.
 ```{r}
 mv_res_emot <- subset(mv_res_emot, !(group_cuts == .75 &
                         sub_cuts == .75 &
@@ -157,8 +307,88 @@ mv_res_emot <- subset(mv_res_emot, !(group_cuts == .75 &
 # Visualize Multiverse
 
 ## Personality Dataset
+Preparation: 
+```{r}
+# Color palette
+palette_3 <- colorRampPalette(brewer.pal(9, "RdBu"))(3)
+palette_4 <- colorRampPalette(brewer.pal(9, "RdBu"))(4)
+
+# TODO change blue color values
+
+# Set values explicitly 
+palette_full <- c(palette_4[1:2], "lightblue", palette_4[3:4])
+names(palette_full) <- c("liberal", "medium-liberal", "medium", "medium-strict", "strict")
+
+# Define the desired levels for each factor
+group_levels <- c("liberal", "medium-liberal", "medium-strict", "strict")
+sub_levels <- c("liberal", "medium-liberal", "medium-strict", "strict")
+rmsea_levels <- c("strict", "medium", "liberal")
+srmr_levels <- c("strict", "medium", "liberal")
+nnfi_levels <- c("liberal", "medium", "strict")
+cfi_levels <- c("liberal", "medium", "strict")
+n_excels_levels <- c("strict", "medium", "liberal")
+
+```
+
 
 ### Manuscript
+
+Specification curve plot adjacency matrix
+```{r}
+plot_out_adj_pers <- plot_outcome(mv_res = comp_pers, var = sum_adj_diff,
+                                  y_label = "Sum of Adjacency Matrix Differences") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+plot_spec_adj_pers <- plot_specification(mv_res = comp_pers, var = sum_adj_diff)+
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+
+# Combine Plots
+spec_plot_adj_pers <- cowplot::plot_grid(plot_out_adj_pers, plot_spec_adj_pers, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_adj_pers.pdf", spec_plot_adj_pers, path = here("figures/"),
+       device = "pdf", height = 16, width = 16)
+
+
+
+```
+
+
+
+
+Network multiverse plot
+```{r}
+# TODO add better legend/node labels here
+pdf(here("figures/mv_net_pers.pdf"), width = 8, height = 4)
+multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.2)
+dev.off()
+
+```
+
+
+Specification curve plot density
+```{r}
+plot_out_dens_pers <- plot_outcome(mv_res = comp_pers, 
+                              var = mean_diff_dens_cont_i,
+                              y_label = "Density Difference") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+plot_spec_dens_pers <- plot_specification(mv_res = comp_pers, var = mean_diff_dens_cont_i)+
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+
+# Combine Plots
+spec_plot_dens_pers <- cowplot::plot_grid(plot_out_dens_pers, plot_spec_dens_pers, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_dens_pers.pdf", spec_plot_dens_pers, path = here("figures/"),
+       device = "pdf", height = 16, width = 16)
+
+
+
+```
+
 
 
 ### Supplement
