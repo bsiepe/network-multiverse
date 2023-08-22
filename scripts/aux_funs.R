@@ -496,10 +496,15 @@ simulateVARtest <- function(A         = NULL,
 multiverse.network <- function(mv_res, 
                                n_lagged = NULL, # number of lagged variables, assumed to be half the columns if not specified
                                cutoff = NULL,    # only include effects with certain proportion of occurrence? 
-                               split_graph = TRUE){  # show temporal and contemporaneous seperated    
+                               split_graph = TRUE, # show temporal and contemporaneous seperated  
+                               ...){              # additional arguments to be passed to qgraph 
   
   # Count matrix across iterations
-  count_mat <- as.matrix(Reduce('+', mv_res$adj_sum_mat_i))
+  # congratulations to myself for this unwieldy code
+  count_mat <- Reduce('+', lapply(mv_res$l_adj_i, function(x){
+    as.matrix(Reduce('+', x))
+  }))
+
   
   n_ind <- length(mv_res$l_diff_ests_i[[1]])
   
@@ -537,8 +542,11 @@ multiverse.network <- function(mv_res,
       fade         = FALSE,
       # arrows       = FALSE,
       labels = colnames(cont_mat),    # so that this does not show "lag" in name
-      label.cex    = 2,
-      title = "Temporal")
+      # title.cex = 2, 
+      # label.cex    = 1.25,
+      title = "Temporal",
+      maximum = 1,
+      ...)
     
     # Contemporaneous
     qgraph::qgraph(
@@ -552,8 +560,11 @@ multiverse.network <- function(mv_res,
       fade = FALSE,
       # arrows   = FALSE,
       labels = colnames(cont_mat),
-      label.cex = 2,
-      title = "Contemporaneous")
+      # title.cex = 2,
+      # label.cex = 1.25,
+      title = "Contemporaneous",
+      maximum = 1, 
+      ...)
     
   }
   
@@ -572,7 +583,9 @@ multiverse.network <- function(mv_res,
       # arrows       = FALSE,
       labels       = 
         colnames(prop_mat)[(n_lagged+1):(ncol(prop_mat))],
-      label.cex    = 2)
+      # title.cex = 2,
+      # label.cex    = 1.25,
+      ...)
   }
 
   
@@ -642,6 +655,80 @@ theme_multiverse <- function() {
 
 
 
+# Specification Plot ------------------------------------------------------
+
+# For lineplot
+plot_outcome <- function(mv_res, 
+                         var,
+                         specs = NULL, # hard-coded for now
+                         y_label){   
+  
+  var <- enquo(var)
+  
+  mv_res %>% 
+    dplyr::mutate(variable = as.numeric(!!var)) %>% 
+    dplyr::arrange(variable) %>% 
+    dplyr::mutate(iteration = dplyr::row_number()) %>%
+    ggplot(aes(x = .data$iteration,
+               y = variable)) + 
+    geom_point(size = 0.8)+
+    theme_multiverse()+
+    labs(x = "Iteration", 
+           y = y_label)
+}
+
+# For Specification Plot
+plot_specification <- function(mv_res,
+                               var,
+                               specs = NULL){    # hard-coded for now
+  
+  var <- enquo(var)
+  
+  mv_res %>% 
+    dplyr::mutate(variable = as.numeric(!!var)) %>% 
+    dplyr::arrange(variable) %>% 
+    dplyr::mutate(iteration = dplyr::row_number()) %>%
+    dplyr::mutate(across(c(groupcutoffs, subcutoffs,
+                           rmsea.cuts, srmr.cuts,
+                           cfi.cuts, nnfi.cuts,
+                           n.excellent), ~ as.factor(.))) %>% 
+    dplyr::mutate(groupcutoffs = fct_recode(groupcutoffs, !!!setNames(as.character(group_cuts), group_levels)),
+                  subcutoffs = fct_recode(subcutoffs, !!!setNames(as.character(sub_cuts), sub_levels)),
+                  rmsea.cuts = fct_recode(rmsea.cuts, !!!setNames(as.character(rmsea_cuts), rmsea_levels)),
+                  srmr.cuts = fct_recode(srmr.cuts, !!!setNames(as.character(srmr_cuts), srmr_levels)),
+                  cfi.cuts = fct_recode(cfi.cuts, !!!setNames(as.character(cfi_cuts), cfi_levels)),
+                  nnfi.cuts = fct_recode(nnfi.cuts, !!!setNames(as.character(nnfi_cuts), nnfi_levels)),
+                  n.excellent = fct_recode(n.excellent, !!!setNames(as.character(n_excels), n_excels_levels))) %>% 
+    tidyr::pivot_longer(cols = c(groupcutoffs,
+                                 subcutoffs,
+                                 rmsea.cuts,
+                                 srmr.cuts,
+                                 cfi.cuts,
+                                 nnfi.cuts,
+                                 n.excellent),
+                        values_to = "value", names_to = "specification") %>% 
+    ggplot(aes(x = .data$iteration,
+               y = 1,
+               color = .data$value)) + 
+    geom_point(shape = 124, size = 15
+               #pch='.'   #for faster plotting
+    )+
+    scale_y_continuous(limits = c(0.99, 1.01), expand = c(0,0))+
+    theme_multiverse()+
+    scale_color_manual(values = palette_full)+
+    facet_wrap(specification~., 
+               ncol = 1, 
+               strip.position = "left")+
+    labs(y = "",
+         x = "Iteration",
+         color = "Specification")+
+    theme(axis.ticks.y = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid.major.y = element_blank(),
+          panel.grid.minor.y = element_blank(),
+          panel.spacing.y = unit(0, "lines"),
+          legend.text = element_text(size = rel(1.2)))
+}
 
 
 # -------------------------------------------------------------------------
@@ -661,13 +748,14 @@ theme_multiverse <- function() {
 #' @return A tibble containing the comparison results at different levels: group-level, subgroup-level, and individual-level comparison along with condition information for each specification.
 #' @export
 multiverse.compare <- function(l_res,
-                               ref_model
+                               ref_model,
+                               n_ind
 ){
   # browser()
   
   #---- Compare Group-Level
   comp_group <- multiverse.compare.group(
-    l_res = l_res, ref_model = ref_model
+    l_res = l_res, ref_model = ref_model, n_ind = n_ind
   )
   
   #---- Compare Subgroup-Level
@@ -695,11 +783,12 @@ multiverse.compare <- function(l_res,
 
 
 multiverse.compare.group <- function(l_res,
-                                     ref_model){
+                                     ref_model,
+                                     n_ind){
   
   #--- Reference model info
   # TODO this will have to account for nonconvergence
-  n_ind <- length(ref_model$fit)
+  # n_ind <- length(ref_model$fit)
   n_var <- ref_model$n_vars_total
   
   # indices for temporal and contemporaneous
@@ -891,12 +980,23 @@ multiverse.compare.individual <- function(l_res,
     # ignore AR coefs
     tmp_adj_mats <- lapply(x$path_est_mats, function(y){
       tmp <- ifelse(y != 0, 1, 0)
-      tmp <- diag(tmp[, temp_ind]) <- rep(0, n_var/2)
+      diag(tmp[, temp_ind]) <- rep(0, n_var/2)
       return(tmp)
     })
     l_adj <- Map('-', ref_adj_mats, tmp_adj_mats)
     lapply(l_adj, function(y){as.matrix(y)})
   })
+  
+  # Return adjacency matrix for each individual
+  l_adj <- lapply(l_res, function(x){
+    tmp_adj_mats <- lapply(x$path_est_mats, function(y){
+      tmp <- ifelse(y != 0, 1, 0)
+      diag(tmp[, temp_ind]) <- rep(0, n_var/2)
+      return(tmp)
+    })
+    return(tmp_adj_mats)
+  })
+  
   #--- Difference/bias path estimates
   l_diff_ests <- lapply(l_res, function(x){
     l_est <- Map('-', ref_path_est_mats, x$path_est_mats)
@@ -969,18 +1069,18 @@ multiverse.compare.individual <- function(l_res,
   #--- Nondirected adjacency
   mean_diff_nondir_adj <- lapply(l_diff_nondir_adj, function(x){
     l_tmp <- list()
-    l_tmp$nondir_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-    l_tmp$nondir_adj_sum_sum_i <- sum(l_tmp$nondir_adj_sum_mat)
-    l_tmp$nondir_adj_sum_mean_i <- mean(l_tmp$nondir_adj_sum_mat)
+    l_tmp$diff_nondir_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
+    l_tmp$diff_nondir_adj_sum_sum_i <- sum(l_tmp$nondir_adj_sum_mat)
+    l_tmp$diff_nondir_adj_sum_mean_i <- mean(l_tmp$nondir_adj_sum_mat)
     return(l_tmp)
   })
   
   #--- Adjacency matrix
   mean_diff_adj <- lapply(l_diff_adj, function(x){
     l_tmp <- list()
-    l_tmp$adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-    l_tmp$adj_sum_sum_i <- sum(l_tmp$adj_sum_mat)
-    l_tmp$adj_sum_mean_i <- mean(l_tmp$adj_sum_mat)
+    l_tmp$diff_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
+    l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$adj_sum_mat)
+    l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$adj_sum_mat)
     return(l_tmp)
   })
   
@@ -997,8 +1097,8 @@ multiverse.compare.individual <- function(l_res,
   })
   
   #--- Densities
-  mean_diff_dens_temp <- sapply(l_diff_dens_temp, mean)
-  mean_diff_dens_cont <- sapply(l_diff_dens_cont, mean)
+  mean_diff_dens_temp <- sapply(l_diff_dens_temp, abs_mean)
+  mean_diff_dens_cont <- sapply(l_diff_dens_cont, abs_mean)
   
   
   #--- Fits 
@@ -1036,6 +1136,7 @@ multiverse.compare.individual <- function(l_res,
     l_implausible_i = l_implausible,
     sum_implausible_i = sum_implausible,
     l_diff_nondir_adj_i = l_diff_nondir_adj,
+    l_adj_i = l_adj, 
     l_diff_adj_i = l_diff_adj,
     l_diff_ests_i = l_diff_ests,
     l_diff_fit_i = l_diff_fit,
