@@ -87,6 +87,62 @@ mv_res_pers <- readRDS(here("output/mv_personality/mv_res_pers2.RDS"))
 ```
 
 
+
+
+
+## Emotion Dataset
+
+```{r multiverse-personality}
+mv_res_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutput"),
+                          groupcutoffs = c(.50, .60, .75, .80), 
+                          subcutoffs = c(.50, .60, .75, .80),
+                          rmsea.cuts = c(.03, .05, .08),
+                          srmr.cuts = c(.03, .05, .08),
+                          nnfi.cuts = c(.90, .95, .97),
+                          cfi.cuts = c(.90, .95, .97),
+                          n.excellent = c(1, 2, 3),
+                          n.cores = 1,
+                          prune_output = TRUE,
+                          save_output = TRUE, 
+                          save_dir = here("output/mv_emotion"))
+
+```
+
+
+# Analyze multiverse
+
+## Personality Dataset
+Delete reference fit from multiverse dataset.
+```{r}
+ref_fit_ind <- multiverse_grid %>% 
+  mutate(spec = dplyr::row_number()) %>% 
+  filter(group_cuts == .75 &
+                        sub_cuts == .50 &
+                        rmsea_cuts == .05 &
+                        srmr_cuts == .05 &
+                        nnfi_cuts == .95 &
+                        cfi_cuts == .95 &
+                        n_excels == 2) %>% 
+  pull(spec)
+
+ref_fit_pers <- mv_res_pers[[ref_fit_ind]]
+mv_res_pers <- mv_res_pers[-ref_fit_ind]
+
+
+# FOR TESTING ONLY
+short_mv_res_pers <- mv_res_pers[1:50]
+comp_test <- multiverse.compare(short_mv_res_pers, ref_fit_pers, n_ind = 94)
+
+
+tic()
+comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers, n_ind = 94)
+toc()
+saveRDS(comp_pers, here("output/mv_personality/comp_pers.RDS"))
+comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
+```
+
+
+
 Sanity checks: compare GIMME results to mvgimme
 ```{r}
 g_50_50 <- gimme::gimme(data = here("data/wright_2019/individual_files"),
@@ -113,57 +169,65 @@ g_80_50 <- gimme::gimme(data = here("data/wright_2019/individual_files"),
                           groupcutoff = .80, 
                           subcutoff = .50)
 
-```
 
+# Comparison
+g_50_50$fit$sub_membership
+g_50_75$fit$sub_membership
+g_80_50$fit$sub_membership
 
-
-## Emotion Dataset
-
-```{r multiverse-personality}
-mv_res_emot <- mvgimme::multiverse.gimme(data = "data/kullar_2023/finaloutput",
-                          groupcutoffs = c(.50, .60, .75, .80), 
-                          subcutoffs = c(.50, .60, .75, .80),
-                          rmsea.cuts = c(.03, .05, .08),
-                          srmr.cuts = c(.03, .05, .08),
-                          nnfi.cuts = c(.90, .95, .97),
-                          cfi.cuts = c(.90, .95, .97),
-                          n.excellent = c(1, 2, 3),
-                          n.cores = 1,
-                          prune_output = TRUE,
-                          save_output = TRUE, 
-                          save_dir = "output/mv_emotion")
-
-
-# todo change output directory to correct dir
-# fst::write_fst(mv_res_pers, path = here::here("output/mv_emotion/"))
-
-
-```
-
-
-# Analyze multiverse
-
-## Personality Dataset
-Delete reference fit from multiverse dataset.
-```{r}
-ref_fit_ind <- multiverse_grid %>% 
+ind_50_50 <- multiverse_grid %>% 
   mutate(spec = dplyr::row_number()) %>% 
-  filter(group_cuts == .75 &
+  filter(group_cuts == .50 &
                         sub_cuts == .50 &
                         rmsea_cuts == .05 &
                         srmr_cuts == .05 &
                         nnfi_cuts == .95 &
                         cfi_cuts == .95 &
                         n_excels == 2) %>% 
-  pull(spec)
+    pull(spec)
 
-ref_fit_pers <- mv_res_pers[[ref_fit_ind]]
-mv_res_pers <- mv_res_pers[-ref_fit_ind]
+ind_50_75 <- multiverse_grid %>% 
+  mutate(spec = dplyr::row_number()) %>% 
+  filter(group_cuts == .50 &
+                        sub_cuts == .75 &
+                        rmsea_cuts == .05 &
+                        srmr_cuts == .05 &
+                        nnfi_cuts == .95 &
+                        cfi_cuts == .95 &
+                        n_excels == 2) %>% 
+    pull(spec)
+
+ind_80_50 <- multiverse_grid %>% 
+  mutate(spec = dplyr::row_number()) %>% 
+  filter(group_cuts == .80 &
+                        sub_cuts == .50 &
+                        rmsea_cuts == .05 &
+                        srmr_cuts == .05 &
+                        nnfi_cuts == .95 &
+                        cfi_cuts == .95 &
+                        n_excels == 2) %>% 
+    pull(spec)
 
 
-comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers, n_ind = 94)
-saveRDS(comp_pers, here("output/mv_personality/comp_pers.RDS"))
+# compare results individually
+mv_50_50 <- mv_res_pers[[ind_50_50]]
+mv_50_75 <- mv_res_pers[[ind_50_75]]
+mv_80_50 <- mv_res_pers[[ind_80_50]]
+
+# compare loglikelihood
+mv_50_50$fit$logl - g_50_50$fit$logl
+mv_50_75$fit$logl - g_50_75$fit$logl
+mv_80_50$fit$logl - g_80_50$fit$logl
+
+# Copmpare path counts
+mv_50_50$path_counts - g_50_50$path_counts
+mv_50_75$path_counts - g_50_75$path_counts
+mv_80_50$path_counts - g_80_50$path_counts
+
+
 ```
+
+
 
 
 ### Summary statistics
@@ -238,6 +302,7 @@ sum(avg_diff_adj > 5)
 
 Edge weight differences
 ```{r}
+hist(comp_pers$mean_nonzero_diff_edge_i) # this seems dubiously small
 
 ```
 
@@ -328,6 +393,7 @@ nnfi_levels <- c("liberal", "medium", "strict")
 cfi_levels <- c("liberal", "medium", "strict")
 n_excels_levels <- c("strict", "medium", "liberal")
 
+
 ```
 
 
@@ -382,10 +448,8 @@ plot_spec_dens_pers <- plot_specification(mv_res = comp_pers, var = mean_diff_de
 spec_plot_dens_pers <- cowplot::plot_grid(plot_out_dens_pers, plot_spec_dens_pers, 
                    nrow = 2, align = "h",
                    rel_heights = c(0.5,1))
-ggsave("spec_plot_dens_pers.pdf", spec_plot_dens_pers, path = here("figures/"),
+ggsave("spec_plot_abs_dens_pers.pdf", spec_plot_dens_pers, path = here("figures/"),
        device = "pdf", height = 16, width = 16)
-
-
 
 ```
 
