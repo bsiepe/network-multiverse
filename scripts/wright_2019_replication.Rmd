@@ -99,8 +99,10 @@ We do not use detrended data, as not detrending let's us replicate the original 
 
 ```{r fit-gimme}
 fit <- gimme(
-  data = data_list,
+  data = "data/wright_2019/individual_files",
   out = "data/wright_2019/gimme_output",
+  sep = ",",
+  header = TRUE,
   ar = TRUE,           
   plot = TRUE,         
   subgroup = TRUE,     

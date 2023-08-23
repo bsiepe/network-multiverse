@@ -32,10 +32,12 @@ Maybe also different sparsity levels?
 ```{r sim-settings}
 # sample_sizes <- c(50, 100, 200)
 # For testing only:
-sample_sizes <- c(20)
+# sample_sizes <- c(30, 80)
+sample_sizes <- c(30)
 ar <- c(.2)
+# ind_a <- c(.15, .40)
 ind_a <- c(.15)
-ind_phi <- c(.05)
+ind_phi <- c(.05, .25)
 replications <- 500
 
 sim_design <- SimDesign::createDesign(sample_size = sample_sizes,
@@ -158,6 +160,8 @@ sim_generate <- function(condition,
               path_counts = path_counts, 
               group_ind = group_ind)
   # levels = sim_dat$levels))
+  
+  return(dat)
 }
 
 
@@ -424,13 +428,13 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   
   #----- Subgroup ------
-  ari_sub <- lapply(seq_along(results[[m]]), function(i){
+  ari_sub <- lapply(seq_along(results), function(i){
     
-    if(is.null(results[[m]][[i]]$sub_ind)){
+    if(is.null(results[[i]][[m]]$sub_ind)){
       NULL
     } 
     else{
-      perturbR:::arandi(results[[m]][[i]]$dgp_sub_ind, results[[m]][[i]]$sub_ind)
+      perturbR:::arandi(results[[i]][[m]]$dgp_sub_ind, results[[i]][[m]]$sub_ind)
     }
     
   })
@@ -494,13 +498,13 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   bias_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_diff))
   bias_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_diff)) / (replications * (replications - 1)))
   
-  
+  # browser()
   # Output
   ret_mod <- c(ari_mean = ari_mean,
            ari_sd = ari_sd,
            precision_directed_mean = precision_directed_mean,
            recall_directed_mean = recall_directed_mean,
-           diff_path_counts = diff_path_counts,
+           diff_path_counts_mean = diff_path_counts_mean,
            bias_nonzero_mean = bias_nonzero_mean,
            bias_nonzero_mcse = bias_nonzero_mcse,
            bias_mean = bias_mean,
@@ -509,7 +513,7 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   ret_mod <- unlist(ret_mod)
   ret[[m]] <- ret_mod
   
-  # names(ret)[m] <- names(results[[1]])[m]
+  names(ret)[m] <- names(results[[1]])[m]
   # Add model name
   # names(ret[[m]]) <- paste0(names(ret[[m]]), names(results[[1]])[m])
   
@@ -517,6 +521,7 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
 
   ret <- unlist(ret)
+  # ret <- unname(ret)
   return(ret)
 }
 ```
@@ -532,8 +537,8 @@ sim_res <- SimDesign::runSimulation(sim_design,
                                     save_results = TRUE,
                                     generate = sim_generate, 
                                     analyse = list(
-                                    gimme = sim_analyse_gimme_default,
-                                    liberal = sim_analyse_gimme_liberal,
+                                    gimme = sim_analyse_gimme_default, 
+                                    liberal = sim_analyse_gimme_liberal, 
                                     strict = sim_analyse_gimme_strict
                                     # thresh = sim_analyse_gimme_threshold1
                                     ),
@@ -543,11 +548,15 @@ sim_res <- SimDesign::runSimulation(sim_design,
                                     # save_seeds = TRUE,
                                     packages = c("mvgimme"), 
                                     fixed_objects = sim_pars,
-                                    parallel = TRUE,
-                                    debug = "summarise")
+                                    parallel = TRUE)
+beepr::beep(6)
+
+# maybe try unname() on the aux_funs results
 ```
 
 
-
+# Keeping Track of common bugs:
+Error in do.call(data.frame, c(x, alis)) : 
+  variable names are limited to 10000 bytes - ?????
 
 

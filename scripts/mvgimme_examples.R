@@ -249,74 +249,7 @@ n_excels_levels <- c("strict", "medium", "liberal")
 
 
 
-# For lineplot
-plot_outcome <- function(mv_res, 
-                         var,
-                         specs = NULL){   # hard-coded for nor
-  
-  var <- enquo(var)
-  
-  mv_res %>% 
-    dplyr::mutate(variable = as.numeric(!!var)) %>% 
-    dplyr::arrange(variable) %>% 
-    dplyr::mutate(iteration = dplyr::row_number()) %>%
-    ggplot(aes(x = .data$iteration,
-               y = variable)) + 
-    geom_point(size = 0.8)+
-    theme_multiverse()
-}
 
-# For Specification Plot
-plot_specification <- function(mv_res,
-                               var,
-                               specs = NULL){    # hard-coded for now
-    
-  var <- enquo(var)
-  
-  mv_res %>% 
-    dplyr::mutate(variable = as.numeric(!!var)) %>% 
-    dplyr::arrange(variable) %>% 
-    dplyr::mutate(iteration = dplyr::row_number()) %>%
-    dplyr::mutate(across(c(groupcutoffs, subcutoffs,
-                           rmsea.cuts, srmr.cuts,
-                           cfi.cuts, nnfi.cuts,
-                           n.excellent), ~ as.factor(.))) %>% 
-    dplyr::mutate(groupcutoffs = fct_recode(groupcutoffs, !!!setNames(as.character(group_cuts), group_levels)),
-                  subcutoffs = fct_recode(subcutoffs, !!!setNames(as.character(sub_cuts), sub_levels)),
-                  rmsea.cuts = fct_recode(rmsea.cuts, !!!setNames(as.character(rmsea_cuts), rmsea_levels)),
-                  srmr.cuts = fct_recode(srmr.cuts, !!!setNames(as.character(srmr_cuts), srmr_levels)),
-                  cfi.cuts = fct_recode(cfi.cuts, !!!setNames(as.character(cfi_cuts), cfi_levels)),
-                  nnfi.cuts = fct_recode(nnfi.cuts, !!!setNames(as.character(nnfi_cuts), nnfi_levels)),
-                  n.excellent = fct_recode(n.excellent, !!!setNames(as.character(n_excels), n_excels_levels))) %>% 
-    tidyr::pivot_longer(cols = c(groupcutoffs,
-                                 subcutoffs,
-                                 rmsea.cuts,
-                                 srmr.cuts,
-                                 cfi.cuts,
-                                 nnfi.cuts,
-                                 n.excellent),
-                        values_to = "value", names_to = "specification") %>% 
-  ggplot(aes(x = .data$iteration,
-             y = 1,
-             color = .data$value)) + 
-    geom_point(shape = 124, size = 15
-               #pch='.'   #for faster plotting
-                )+
-    scale_y_continuous(limits = c(0.99, 1.01), expand = c(0,0))+
-    theme_multiverse()+
-    scale_color_manual(values = palette_full)+
-    facet_wrap(specification~., 
-               ncol = 1, 
-               strip.position = "left")+
-    labs(y = "",
-         color = "Specification")+
-    theme(axis.ticks.y = element_blank(),
-          axis.text.y = element_blank(),
-          panel.grid.major.y = element_blank(),
-          panel.grid.minor.y = element_blank(),
-          panel.spacing.y = unit(0, "lines"),
-          legend.text = element_text(size = rel(1.2)))
-}
 
 # for testing
 df_mv_test <- dplyr::slice_sample(df_mv, n = 400)
