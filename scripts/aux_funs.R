@@ -673,7 +673,7 @@ plot_outcome <- function(mv_res,
                y = variable)) + 
     geom_point(size = 0.8)+
     theme_multiverse()+
-    labs(x = "Iteration", 
+    labs(x = "", 
            y = y_label)
 }
 
@@ -706,7 +706,29 @@ plot_specification <- function(mv_res,
                                  cfi.cuts,
                                  nnfi.cuts,
                                  n.excellent),
-                        values_to = "value", names_to = "specification") %>% 
+                        values_to = "value", names_to = "specification") %>%
+    dplyr::mutate(specification = dplyr::case_match(specification,
+                                                    "groupcutoffs" ~ "Group",
+                                                    "subcutoffs" ~ "Subgroup",
+                                                    "rmsea.cuts" ~ "RMSEA",
+                                                    "srmr.cuts" ~ "SRMR",
+                                                    "cfi.cuts" ~ "CFI",
+                                                    "nnfi.cuts" ~ "NNFI",
+                                                    "n.excellent" ~ "N° excellent")) %>% 
+    dplyr::mutate(specification = as.factor(specification)) %>% 
+    dplyr::mutate(specification = forcats::fct_relevel(specification, 
+                                                       "Group", 
+                                                       "Subgroup",
+                                                       "RMSEA", 
+                                                       "SRMR",
+                                                       "CFI",
+                                                       "NNFI")) %>% 
+    dplyr::mutate(value = forcats::fct_relevel(value, 
+                                               "liberal",
+                                               "medium-liberal",
+                                               "medium",
+                                               "medium-strict",
+                                               "strict")) %>% 
     ggplot(aes(x = .data$iteration,
                y = 1,
                color = .data$value)) + 
@@ -727,7 +749,13 @@ plot_specification <- function(mv_res,
           panel.grid.major.y = element_blank(),
           panel.grid.minor.y = element_blank(),
           panel.spacing.y = unit(0, "lines"),
-          legend.text = element_text(size = rel(1.2)))
+          legend.text = element_text(size = rel(1.3)),
+          legend.title = element_text(size = rel(1.3)),
+          legend.spacing.x = unit(0.2, "cm"),
+          legend.text.align = 0,
+          strip.text = element_text(size = rel(1.4)),
+          axis.text.x = element_text(size = rel(1.2)),
+          axis.title.x = element_text(size = rel(1.3)))
 }
 
 
@@ -957,22 +985,22 @@ multiverse.compare.individual <- function(l_res,
   ########################
   #--- Nondirectional recovery
   # Only for contemporaneous effects
-  ref_nondir_adj_mats <- lapply(ref_path_est_mats, function(x){
-    tmp <- ifelse(x[,cont_ind] != 0, 1, 0)
-    tmp <- nondirect_adjacency(tmp)
-    return(tmp)
-  })
-  
-  l_diff_nondir_adj <- lapply(l_res, function(x){
-    tmp_nondir_adj_mats <- lapply(x$path_est_mats, function(y){
-      tmp <- ifelse(y[,cont_ind] != 0, 1, 0)
-      tmp <- nondirect_adjacency(tmp)
-      return(tmp)
-    })
-    l_nondir_adj <- Map('-', ref_nondir_adj_mats, tmp_nondir_adj_mats)
-    lapply(l_nondir_adj, function(y){as.matrix(y)})
-    
-  })
+  # ref_nondir_adj_mats <- lapply(ref_path_est_mats, function(x){
+  #   tmp <- ifelse(x[,cont_ind] != 0, 1, 0)
+  #   tmp <- nondirect_adjacency(tmp)
+  #   return(tmp)
+  # })
+  # 
+  # l_diff_nondir_adj <- lapply(l_res, function(x){
+  #   tmp_nondir_adj_mats <- lapply(x$path_est_mats, function(y){
+  #     tmp <- ifelse(y[,cont_ind] != 0, 1, 0)
+  #     tmp <- nondirect_adjacency(tmp)
+  #     return(tmp)
+  #   })
+  #   l_nondir_adj <- Map('-', ref_nondir_adj_mats, tmp_nondir_adj_mats)
+  #   lapply(l_nondir_adj, function(y){as.matrix(y)})
+  #   
+  # })
   
   #--- Directional recovery
   l_diff_adj <- lapply(l_res, function(x){
@@ -1000,7 +1028,8 @@ multiverse.compare.individual <- function(l_res,
   #--- Difference/bias path estimates
   l_diff_ests <- lapply(l_res, function(x){
     l_est <- Map('-', ref_path_est_mats, x$path_est_mats)
-    lapply(l_est, function(y){as.matrix(y)})
+    l_est <- lapply(l_est, function(y){as.matrix(y)})
+    simplify2array(l_est)
   })
   
   
@@ -1053,8 +1082,8 @@ multiverse.compare.individual <- function(l_res,
       max_cont_ref <- which.max(ref_outstrength[[j]][cont_ind])
       max_cont_mv <- which.max(l_cent[[i]][[j]][cont_ind])
       central_node_identical[[i]][[j]] <- list()
-      central_node_identical[[i]][[j]]$temp_identical <- max_temp_ref == max_temp_mv
-      central_node_identical[[i]][[j]]$cont_identical <- max_cont_ref == max_cont_mv
+      central_node_identical[[i]][[j]]$temp_identical <- names(max_temp_ref) == names(max_temp_mv)
+      central_node_identical[[i]][[j]]$cont_identical <- names(max_cont_ref) == names(max_cont_mv)
     }
   }
   
@@ -1067,20 +1096,20 @@ multiverse.compare.individual <- function(l_res,
   # split by averaging over all nonzero differences, or all differences
   
   #--- Nondirected adjacency
-  mean_diff_nondir_adj <- lapply(l_diff_nondir_adj, function(x){
-    l_tmp <- list()
-    l_tmp$diff_nondir_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-    l_tmp$diff_nondir_adj_sum_sum_i <- sum(l_tmp$nondir_adj_sum_mat)
-    l_tmp$diff_nondir_adj_sum_mean_i <- mean(l_tmp$nondir_adj_sum_mat)
-    return(l_tmp)
-  })
+  # mean_diff_nondir_adj <- lapply(l_diff_nondir_adj, function(x){
+  #   l_tmp <- list()
+  #   l_tmp$diff_nondir_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
+  #   l_tmp$diff_nondir_adj_sum_sum_i <- sum(l_tmp$nondir_adj_sum_mat)
+  #   l_tmp$diff_nondir_adj_sum_mean_i <- mean(l_tmp$nondir_adj_sum_mat)
+  #   return(l_tmp)
+  # })
   
   #--- Adjacency matrix
   mean_diff_adj <- lapply(l_diff_adj, function(x){
     l_tmp <- list()
     l_tmp$diff_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-    l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$adj_sum_mat)
-    l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$adj_sum_mat)
+    l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i)
+    l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i)
     return(l_tmp)
   })
   
@@ -1088,17 +1117,20 @@ multiverse.compare.individual <- function(l_res,
   #--- Mean differences of edges
   mean_diff_ests <- lapply(l_diff_ests, function(x){
     l_tmp <- list()
-    mean_mat <- apply(simplify2array(x), 1:2, mean)
-    l_tmp$mean_nonzero_diff_edge_i <- mean(abs(mean_mat[mean_mat != 0]))
-    l_tmp$med_nonzero_diff_edge_i <- stats::median(abs(mean_mat[mean_mat != 0]))
-    l_tmp$mean_diff_edge_i <- mean(abs(mean_mat))
-    l_tmp$med_diff_edge_i <- stats::median(abs(mean_mat))
+    # mean_mat <- apply(simplify2array(x), 1:2, mean)
+    l_tmp$mean_nonzero_diff_edge_i <- mean(abs(x[which(x != 0, arr.ind = TRUE)]))
+    l_tmp$med_nonzero_diff_edge_i <- stats::median(abs(x[which(x != 0, arr.ind = TRUE)]))
+    l_tmp$mean_diff_edge_i <- mean(abs(x))
+    l_tmp$med_diff_edge_i <- stats::median(abs(x))
     return(l_tmp)
   })
   
   #--- Densities
-  mean_diff_dens_temp <- sapply(l_diff_dens_temp, abs_mean)
-  mean_diff_dens_cont <- sapply(l_diff_dens_cont, abs_mean)
+  mean_abs_diff_dens_temp <- sapply(l_diff_dens_temp, abs_mean)
+  mean_abs_diff_dens_cont <- sapply(l_diff_dens_cont, abs_mean)
+  mean_diff_dens_temp <- sapply(l_diff_dens_temp, mean)
+  mean_diff_dens_cont <- sapply(l_diff_dens_cont, mean)
+  
   
   
   #--- Fits 
@@ -1135,28 +1167,32 @@ multiverse.compare.individual <- function(l_res,
   l_out <- tibble(
     l_implausible_i = l_implausible,
     sum_implausible_i = sum_implausible,
-    l_diff_nondir_adj_i = l_diff_nondir_adj,
+    # l_diff_nondir_adj_i = l_diff_nondir_adj,
     l_adj_i = l_adj, 
     l_diff_adj_i = l_diff_adj,
     l_diff_ests_i = l_diff_ests,
     l_diff_fit_i = l_diff_fit,
     l_diff_cent_i = l_diff_cent,
     central_node_identical_i = central_node_identical,
-    mean_diff_nondir_adj_i = mean_diff_nondir_adj,
+    # mean_diff_nondir_adj_i = mean_diff_nondir_adj,
     mean_diff_adj_i = mean_diff_adj,
     mean_diff_ests_i = mean_diff_ests,
     mean_diff_cent_i = mean_diff_cent,
+    mean_abs_diff_dens_temp_i = mean_abs_diff_dens_temp,
+    mean_abs_diff_dens_cont_i = mean_abs_diff_dens_cont,
     mean_diff_dens_temp_i = mean_diff_dens_temp,
     mean_diff_dens_cont_i = mean_diff_dens_cont,
     sum_temp_central_identical_i = sum_temp_central_identical,
     sum_cont_central_identical_i = sum_cont_central_identical,
     mean_diff_fit_i = mean_diff_fits
   ) %>% 
-    tidyr::unnest_wider(c(mean_diff_nondir_adj_i,
+    tidyr::unnest_wider(c(
+                          # mean_diff_nondir_adj_i,
                           mean_diff_adj_i,
                           mean_diff_ests_i, 
                           mean_diff_cent_i,
                           mean_diff_fit_i))
+  
   return(l_out)
 }
 
