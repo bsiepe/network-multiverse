@@ -25,8 +25,8 @@ set.seed(35037)
 We load the reference fits, i.e. results of GIMME as reported in the literature. 
 
 ```{r load-ref-fits}
-ref_fit_pers <- readRDS(here("data/wright_2019/wright_2019_fit_nondetrend.RDS"))
-ref_fit_emot <- readRDS(here("data/kullar_2023/kullar_2023_fit.RDS"))
+ref_fit_pers_og <- readRDS(here("data/wright_2019/wright_2019_fit_nondetrend.RDS"))
+ref_fit_emot_og <- readRDS(here("data/kullar_2023/kullar_2023_fit.RDS"))
 ```
 
 
@@ -94,17 +94,24 @@ mv_res_pers <- readRDS(here("output/mv_personality/mv_res_pers2.RDS"))
 
 ```{r multiverse-personality}
 mv_res_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutput"),
-                          groupcutoffs = c(.50, .60, .75, .80), 
-                          subcutoffs = c(.50, .60, .75, .80),
-                          rmsea.cuts = c(.03, .05, .08),
-                          srmr.cuts = c(.03, .05, .08),
-                          nnfi.cuts = c(.90, .95, .97),
-                          cfi.cuts = c(.90, .95, .97),
-                          n.excellent = c(1, 2, 3),
+                                         header = TRUE,
+                                         sep = ",",
+                                         subgroup = TRUE,
+                                         ar = TRUE,
+                          groupcutoffs = c(.75), 
+                          subcutoffs = c(.51),
+                          rmsea.cuts = c(.05),
+                          srmr.cuts = c(.05),
+                          nnfi.cuts = c(.95),
+                          cfi.cuts = c(.95),
+                          n.excellent = c(2),
                           n.cores = 1,
                           prune_output = TRUE,
                           save_output = TRUE, 
                           save_dir = here("output/mv_emotion"))
+
+mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot2.RDS"))
+
 
 ```
 
@@ -132,11 +139,13 @@ mv_res_pers <- mv_res_pers[-ref_fit_ind]
 # FOR TESTING ONLY
 short_mv_res_pers <- mv_res_pers[1:50]
 comp_test <- multiverse.compare(short_mv_res_pers, ref_fit_pers, n_ind = 94)
+saveRDS(comp_test, here("Network-Multiverse/data/comp_test_pers.RDS"))
+
 
 
 tic()
 comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers, n_ind = 94)
-toc()
+toc() # 1439.33 sec elapsed
 saveRDS(comp_pers, here("output/mv_personality/comp_pers.RDS"))
 comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
 ```
@@ -302,7 +311,12 @@ sum(avg_diff_adj > 5)
 
 Edge weight differences
 ```{r}
-hist(comp_pers$mean_nonzero_diff_edge_i) # this seems dubiously small
+hist(comp_pers$mean_nonzero_diff_edge_i)
+mean(comp_pers$mean_nonzero_diff_edge_i, na.rm = TRUE)
+sd(comp_pers$mean_nonzero_diff_edge_i, na.rm = TRUE)
+mean(comp_pers$mean_diff_edge_i)
+sd(comp_pers$mean_diff_edge_i)
+
 
 ```
 
@@ -355,23 +369,183 @@ summary(fit_ind_diff)
 
 ## Emotion Dataset
 Delete reference fit from multiverse dataset.
+TODO it was .51, not .75. 
 ```{r}
-mv_res_emot <- subset(mv_res_emot, !(group_cuts == .75 &
-                        sub_cuts == .75 &
-                        rsmea_cuts == .05 &
-                        srms_cuts == .05 &
+ref_fit_ind <- multiverse_grid %>% 
+  mutate(spec = dplyr::row_number()) %>% 
+  filter(group_cuts == .75 &
+                        sub_cuts == .50 &
+                        rmsea_cuts == .05 &
+                        srmr_cuts == .05 &
                         nnfi_cuts == .95 &
                         cfi_cuts == .95 &
-                        n_excels == 2))
+                        n_excels == 2) %>% 
+  pull(spec)
+
+ref_fit_emot <- mv_res_emot[[ref_fit_ind]]
+mv_res_emot <- mv_res_emot[-ref_fit_ind]
+
+# Analyze
+tic()
+comp_emot <- multiverse.compare(mv_res_emot, ref_fit_emot, n_ind = 105)
+toc() 
+saveRDS(comp_emot, here("output/mv_emotion/comp_emot.RDS"))
+
+```
+
+
+Sanity check comparison: 
+```{r}
+g_75_51_emot <- mvgimme::multiverse.gimme()
+
+```
+
+
+
+
+
+
+
+
+### Summary statistics
+#### Group-Level
+Nonconvergence:
+```{r}
+summary(sapply(mv_res_emot, function(y){
+  sum(unlist(lapply(y$path_est_mats, function(x) is.logical(x))))
+}))
+
+
+```
+
+
+Number of group-level edges:
+```{r}
+# subtract the 6 AR paths
+n_group_paths <- sapply(comp_emot$adjacency_g, function(x) sum(unlist(x))) - 10
+summary(n_group_paths)
+prop.table(table(n_group_paths))
+```
+Which group-level paths were found most often?
+```{r}
+Reduce('+', comp_emot$adjacency_g)
+```
+
+Heterogeneity of the solution
+```{r}
+summary(unlist(comp_emot$heterogeneity_g))
+```
+
+
+
+#### Subgroup-Level
+Number and size of subgruops
+```{r}
+summary(unlist(comp_emot$n_sub_g))
+table(unlist(comp_emot$size_sub_s))
+```
+
+
+#### Individual-Level
+Adjacency matrix differences, summed across all individuals within a specification.
+TODO account for absolute differences. 
+```{r}
+comp_emot$sum_adj_diff <- lapply(comp_emot$l_diff_adj_i, function(x) sum(Reduce('+', x)))
+sd(abs(unlist(comp_emot$sum_adj_diff)))/105
+  
+
+# Check if there are individuals for whom there was a greater difference
+# Custom function to add matrices element-wise
+add_matrices <- function(matrix_list) {
+  reduce_matrix <- matrix(0, nrow = nrow(matrix_list[[1]]), ncol = ncol(matrix_list[[1]]))
+  for (matrix in matrix_list) {
+    reduce_matrix <- reduce_matrix + matrix
+  }
+  reduce_matrix
+}
+
+# Use lapply to apply the custom function to each matrix name across all elements
+result <- lapply(names(comp_emot$l_diff_adj_i[[1]]), function(matrix_name) {
+  add_matrices(lapply(comp_emot$l_diff_adj_i, function(element) element[[matrix_name]]))
+})
+
+# calculate average difference
+avg_diff_adj <- sapply(result, function(x) sum(abs(x)))/3887
+summary(avg_diff_adj)
+sum(avg_diff_adj > 5)
+
+```
+
+
+Edge weight differences
+```{r}
+hist(comp_emot$mean_nonzero_diff_edge_i)
+mean(comp_emot$mean_nonzero_diff_edge_i, na.rm = TRUE)
+sd(comp_emot$mean_nonzero_diff_edge_i, na.rm = TRUE)
+mean(comp_emot$mean_diff_edge_i)
+sd(comp_emot$mean_diff_edge_i)
 
 
 ```
 
 
 
-# Visualize Multiverse
+Identical centrality estimates
+```{r}
+summary(comp_emot$sum_temp_central_identical_i)
+summary(comp_emot$sum_cont_central_identical_i)
 
-## Personality Dataset
+# Again, calculate individual differences
+l_temp_ident <- list()
+l_cont_ident <- list()
+for(i in 1:comp_emot$n_ind[[1]]){
+  l_temp_ident[[i]] <- lapply(comp_emot$central_node_identical_i, function(x){
+    x[[i]]$temp_identical
+  })
+  l_cont_ident[[i]] <- lapply(comp_emot$central_node_identical_i, function(x){
+    x[[i]]$cont_identical
+  })
+}
+
+# How often are they identical?
+most_cent_ident_temp <- sapply(l_temp_ident, function(x){sum(unlist(x))})
+sum(most_cent_ident_temp >= 3887)
+
+most_cent_ident_cont <- sapply(l_cont_ident, function(x){sum(unlist(x))})
+sum(most_cent_ident_cont >= 3887)
+
+# identical for both
+sum(most_cent_ident_temp >= 3887 & most_cent_ident_cont >= 3887)
+
+# identical less than one third
+sum(most_cent_ident_temp <= 3887/3)
+sum(most_cent_ident_cont <= 3887/3)
+
+
+```
+
+
+Fit indices
+```{r}
+fit_ind_diff <- do.call(rbind, comp_emot$mean_diff_fit_i)
+mean_fit_ind_diff <- colMeans(fit_ind_diff)
+summary(fit_ind_diff)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Visualize Multiverse
 Preparation: 
 ```{r}
 # Color palette
@@ -396,6 +570,8 @@ n_excels_levels <- c("strict", "medium", "liberal")
 
 ```
 
+## Personality Dataset
+
 
 ### Manuscript
 
@@ -416,8 +592,6 @@ spec_plot_adj_pers <- cowplot::plot_grid(plot_out_adj_pers, plot_spec_adj_pers,
 ggsave("spec_plot_adj_pers.pdf", spec_plot_adj_pers, path = here("figures/"),
        device = "pdf", height = 16, width = 16)
 
-
-
 ```
 
 
@@ -427,7 +601,7 @@ Network multiverse plot
 ```{r}
 # TODO add better legend/node labels here
 pdf(here("figures/mv_net_pers.pdf"), width = 8, height = 4)
-multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.2)
+multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.2, n_ind = 94)
 dev.off()
 
 ```
@@ -459,6 +633,63 @@ ggsave("spec_plot_abs_dens_pers.pdf", spec_plot_dens_pers, path = here("figures/
 
 
 ## Emotion Dataset
+
+Specification curve plot adjacency matrix
+```{r}
+plot_out_adj_emot <- plot_outcome(mv_res = comp_emot, var = sum_adj_diff,
+                                  y_label = "Sum of Adjacency Matrix Differences") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+plot_spec_adj_emot <- plot_specification(mv_res = comp_emot, var = sum_adj_diff)+
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+
+# Combine Plots
+spec_plot_adj_emot <- cowplot::plot_grid(plot_out_adj_emot, plot_spec_adj_emot, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_adj_emot.pdf", spec_plot_adj_emot, path = here("figures/"),
+       device = "pdf", height = 16, width = 16)
+
+```
+
+
+Network multiverse plot
+```{r}
+# TODO add better legend/node labels here
+pdf(here("figures/mv_net_emot.pdf"), width = 8, height = 4)
+multiverse.network(comp_emot, cutoff = .05, 
+                   title.cex = 1, label.cex = 1.2, 
+                   n_ind = 105)
+dev.off()
+
+```
+
+
+Specification curve plot density
+```{r}
+plot_out_dens_emot <- plot_outcome(mv_res = comp_emot, 
+                              var = mean_diff_dens_cont_i,
+                              y_label = "Density Difference") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+plot_spec_dens_emot <- plot_specification(mv_res = comp_emot, var = mean_diff_dens_cont_i)+
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+
+# Combine Plots
+spec_plot_dens_emot <- cowplot::plot_grid(plot_out_dens_emot, plot_spec_dens_emot, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_abs_dens_emot.pdf", spec_plot_dens_emot, path = here("figures/"),
+       device = "pdf", height = 16, width = 16)
+
+rm(plot_out_dens_emot)
+rm(plot_spec_dens_emot)
+rm(spec_plot_dens_emot)
+```
+
+
 
 ### Manuscript
 
