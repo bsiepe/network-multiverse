@@ -98,19 +98,23 @@ mv_res_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutp
                                          sep = ",",
                                          subgroup = TRUE,
                                          ar = TRUE,
-                          groupcutoffs = c(.75), 
-                          subcutoffs = c(.51),
-                          rmsea.cuts = c(.05),
-                          srmr.cuts = c(.05),
-                          nnfi.cuts = c(.95),
-                          cfi.cuts = c(.95),
-                          n.excellent = c(2),
-                          n.cores = 1,
+                          groupcutoffs = group_cuts, 
+                          subcutoffs = sub_cuts,
+                          rmsea.cuts = rmsea_cuts,
+                          srmr.cuts = srmr_cuts,
+                          nnfi.cuts = nnfi_cuts,
+                          cfi.cuts = cfi_cuts,
+                          n.excellent = n_excels,
+                          n.cores = 60,
                           prune_output = TRUE,
                           save_output = TRUE, 
+                          exogenous = "TimeofDay",
                           save_dir = here("output/mv_emotion"))
 
-mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot2.RDS"))
+
+# 248908.521 sec
+# saveRDS(mv_res_emot, file = here("output/mv_emotion/mv_res_emot_new.RDS"))
+mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot_new.RDS"))
 
 
 ```
@@ -369,7 +373,7 @@ summary(fit_ind_diff)
 
 ## Emotion Dataset
 Delete reference fit from multiverse dataset.
-TODO it was .51, not .75. 
+TODO it was .51, not .75, so maybe compare to original dataset?
 ```{r}
 ref_fit_ind <- multiverse_grid %>% 
   mutate(spec = dplyr::row_number()) %>% 
@@ -387,8 +391,9 @@ mv_res_emot <- mv_res_emot[-ref_fit_ind]
 
 # Analyze
 tic()
-comp_emot <- multiverse.compare(mv_res_emot, ref_fit_emot, n_ind = 105)
-toc() 
+comp_emot <- multiverse.compare(mv_res_emot, ref_fit_emot_og, n_ind = 105)
+toc()  # 2040.35 sec elapsed
+beepr::beep(6)
 saveRDS(comp_emot, here("output/mv_emotion/comp_emot.RDS"))
 
 ```
@@ -396,13 +401,31 @@ saveRDS(comp_emot, here("output/mv_emotion/comp_emot.RDS"))
 
 Sanity check comparison: 
 ```{r}
-g_75_51_emot <- mvgimme::multiverse.gimme()
+g_75_51_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutput"),
+                                         header = TRUE,
+                                         sep = ",",
+                                         subgroup = TRUE,
+                                         ar = TRUE,
+                                         groupcutoffs = .75,
+                                         subcutoffs = .51,
+                                         rmsea.cuts = .05,
+                                         srmr.cuts = .05,
+                                         nnfi.cuts = .95,
+                                         cfi.cuts = .95,
+                                         n.excellent = 2,
+                                         prune_output = TRUE,
+                                         exogenous = "TimeofDay")
+saveRDS(g_75_51_emot, here("output/mv_emotion/g_75_51_emot.RDS"))
+
+# check subgrouping
+g_75_51_emot[[1]]$path_counts - ref_fit_emot_og$path_counts
+
+# This 1 % difference changes a lot
+subcheck <- Map('-', ref_fit_emot$path_counts_sub, ref_fit_emot_og$path_counts_sub)
+sum(abs(unlist(subcheck)))
+
 
 ```
-
-
-
-
 
 
 
@@ -411,7 +434,7 @@ g_75_51_emot <- mvgimme::multiverse.gimme()
 #### Group-Level
 Nonconvergence:
 ```{r}
-summary(sapply(mv_res_emot, function(y){
+table(sapply(mv_res_emot, function(y){
   sum(unlist(lapply(y$path_est_mats, function(x) is.logical(x))))
 }))
 
@@ -421,8 +444,8 @@ summary(sapply(mv_res_emot, function(y){
 
 Number of group-level edges:
 ```{r}
-# subtract the 6 AR paths
-n_group_paths <- sapply(comp_emot$adjacency_g, function(x) sum(unlist(x))) - 10
+# subtract the AR paths
+n_group_paths <- sapply(comp_emot$adjacency_g, function(x) sum(unlist(x)))
 summary(n_group_paths)
 prop.table(table(n_group_paths))
 ```
@@ -441,9 +464,43 @@ summary(unlist(comp_emot$heterogeneity_g))
 #### Subgroup-Level
 Number and size of subgruops
 ```{r}
-summary(unlist(comp_emot$n_sub_g))
+# summary(unlist(comp_emot$n_sub_g)) # there is an error here for now
+# TODO change back after recomputing
+table(unlist(lapply(mv_res_emot, function(x){
+  length(unique(x$fit$sub_membership))
+})))
+
 table(unlist(comp_emot$size_sub_s))
+
+# Check number of distinct solutions
+length(unique(lapply(comp_emot$size_sub_s, function(x){
+  as.character(x)
+})))
+
+# Which are these?
+unique(lapply(comp_emot$size_sub_s, function(x){
+  as.character(x)
+}))
+
 ```
+subgroup membership
+
+
+
+ARI and VI
+```{r}
+table(comp_emot$vi)
+table(comp_emot$ari)
+
+# When is ARI low?
+comp_emot %>% 
+  filter(ari != 1) %>% 
+  count(groupcutoffs, subcutoffs)
+
+```
+
+
+
 
 
 #### Individual-Level
