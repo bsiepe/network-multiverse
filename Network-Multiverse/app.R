@@ -14,25 +14,35 @@ library(kableExtra)
 #--- Variable names
 cond_vars <- c("groupcutoffs", "subcutoffs", "rmsea.cuts", "srmr.cuts",
                "nnfi.cuts", "cfi.cuts", "n.excellent")
-summary_vars <- c("diff_adj_sum_mean_i", "mean_diff_cent_i")
+summary_vars <- c("Heterogeneity", 
+                  # "VI", "ARI", "Modularity",
+                  "Nonzero Edge Diff.", "Adj. Diff.", "Cent. Diff.", 
+                  "Abs. Diff. Density Temp.", "Abs. Diff. Density Cont.")
 
-# nicer column names
-# TODO will have to do this before I save the datasets for the app
-# names(comp_pers)
-# comp_pers %>% 
-#   dplyr::rename(Heterogeneity = heterogeneity_g,
-#                 VI = vi,
-#                 ARI = ari,
-#                 "Mean Adj. Diff." = diff_adj_sum_mean_i)
 
 
 # # --- Data for testing
 # comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
+# # nicer column names
+# # TODO will have to do this before I save the datasets for the app
+# # names(comp_pers)
+# comp_pers <- comp_pers %>%
+#   dplyr::rename(Heterogeneity = heterogeneity_g,
+#                 VI = vi,
+#                 ARI = ari,
+#                 Modularity = modularity,
+#                 "Nonzero Edge Diff." = mean_nonzero_diff_edge_i,
+#                 "Adj. Diff." = diff_adj_sum_mean_i,
+#                 "Cent. Diff." = mean_diff_cent_i,
+#                 "Abs. Diff. Density Temp." = mean_abs_diff_dens_temp_i,
+#                 "Abs. Diff. Density Cont." = mean_abs_diff_dens_cont_i) %>% 
+#   unnest(Heterogeneity)
+# 
 # comp_test <- comp_pers %>%
-#   select(diff_adj_sum_mean_i, mean_diff_cent_i, all_of(cond_vars)) %>%
+#   select(all_of(summary_vars), all_of(cond_vars)) %>%
 #   slice_sample(n = 1000)
 # comp_test2 <- comp_pers %>%
-#   select(diff_adj_sum_mean_i, mean_diff_cent_i, all_of(cond_vars)) %>%
+#   select(all_of(summary_vars), all_of(cond_vars)) %>%
 #   slice_sample(n = 1000)
 # saveRDS(comp_test, here("Network-Multiverse/data/comp_test_pers.RDS"))
 # saveRDS(comp_test2, here("Network-Multiverse/data/comp_test_emot.RDS"))
@@ -243,30 +253,26 @@ ui <- fluidPage(
                tags$p("Follow these steps to use the app:"),
                tags$ol(
                  tags$li("Select a dataset from the dropdown menu below. Choose between 'Personality' and 'Emotion'."),
+                 tags$li("Below, you will find an explanation of the variable abbrevations used in this app."),
                  tags$li("Explore the various tabs to analyze the data and visualize insights."),
-                 tags$li("Use the interactive features to compute summary statistics and create interactive boxplots."),
+                 tags$li("Use the interactive features to compute summary statistics and create different plots."),
                ),
                tags$h2("For more information"),
-               tags$p("If you need more details about the app or want to understand the methodology behind the research,"),
-               tags$p("please refer to the corresponding sections in our paper."),
+               tags$p("If you need more details about the methodology behind the research, please refer to the corresponding sections in our paper."),
                tags$p("For any inquiries or feedback, feel free to contact us at bjoern.siepe@uni-marburg.de.")
-               # h3("Exclude Levels from Analysis"),
-               # p("Select the levels you wish to exclude from the analysis for each variable:"),
-               # checkboxGroupInput("exclude_groupcutoffs", "groupcutoffs", choices = group_cuts, selected = NULL),
-               # checkboxGroupInput("exclude_subcutoffs", "subcutoffs", choices = sub_cuts, selected = NULL),
-               # checkboxGroupInput("exclude_rmsea.cuts", "rmsea.cuts", choices = rmsea_cuts, selected = NULL),
-               # checkboxGroupInput("exclude_srmr.cuts", "srmr.cuts", choices = srmr_cuts, selected = NULL),
-               # checkboxGroupInput("exclude_nnfi.cuts", "nnfi.cuts", choices = nnfi_cuts, selected = NULL),
-               # checkboxGroupInput("exclude_cfi.cuts", "cfi.cuts", choices = cfi_cuts, selected = NULL),
-               # checkboxGroupInput("exclude_n.excellent", "n.excellent", choices = n_excels, selected = NULL)
+
              ),
 
              selectInput("dataset", 
                          label = "Choose a Dataset", 
                          choices = c("Personality", "Emotion")),
-             textOutput("dataset_info")
+             textOutput("dataset_info"),
+             # Display the variable explanation table
+             h2("Variable Name Explanations"),
+             tableOutput("variable_table")
            )
   ),
+
   
   # Compute summary statistics
   tabPanel("Summary Statistics",
@@ -277,6 +283,8 @@ ui <- fluidPage(
                  tags$h3("Grouped Summary Statistics"),
                  tags$p("Grouped summary statistics provide insights into how different variables interact and vary across various groups."),
                  tags$p("Choose one or more variables from the dropdown menu to group the summary statistics by those variables."),
+                 tags$p("The string after the underscore(_) at the end of a variable name indicates the summary statistic for the grouping."),
+                 tags$p("For example, Heterogeneity_sd is the standard deviation of the heterogeneity within a given grouping."),
                  selectInput("groupby_vars",
                              label = "Group by:",
                              choices = cond_vars,
@@ -414,6 +422,26 @@ server <- function(input, output, session) {
       ""
     }
   })
+  
+  #--- Variables explained
+  variable_data <- data.frame(
+    Variable = c("Heterogeneity", "Nonzero Edge Diff.", "Adj. Diff.", "Cent. Diff.",
+                 "Abs. Diff. Density Temp.", "Abs. Diff. Density Cont."),
+    Explanation = c(
+      "Proportion of group-level edges to all edges.",
+      "Difference between nonzero edges.",
+      "Adjusted difference.",
+      "Centrality difference.",
+      "Absolute difference density for temporal network.",
+      "Absolute difference density for contemporaneous network."
+    )
+  )
+  
+  # Render the table
+  output$variable_table <- renderTable({
+    variable_data
+  }, rownames = FALSE)
+
   
 
   #--- Grouped summary
