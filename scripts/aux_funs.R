@@ -496,7 +496,8 @@ simulateVARtest <- function(A         = NULL,
 multiverse.network <- function(mv_res, 
                                n_lagged = NULL, # number of lagged variables, assumed to be half the columns if not specified
                                cutoff = NULL,    # only include effects with certain proportion of occurrence? 
-                               split_graph = TRUE, # show temporal and contemporaneous seperated  
+                               split_graph = TRUE, # show temporal and contemporaneous seperated 
+                               n_ind = NULL,      # specify number of individuals manually for now
                                ...){              # additional arguments to be passed to qgraph 
   
   # Count matrix across iterations
@@ -506,7 +507,7 @@ multiverse.network <- function(mv_res,
   }))
 
   
-  n_ind <- length(mv_res$l_diff_ests_i[[1]])
+  # n_ind <- length(mv_res$n_ind[[1]])
   
 
   
@@ -793,7 +794,7 @@ multiverse.compare <- function(l_res,
   
   #---- Compare Individual Solutions
   comp_ind <- multiverse.compare.individual(
-    l_res = l_res, ref_model = ref_model
+    l_res = l_res, ref_model = ref_model, n_ind = n_ind
   )   
   
   #--- Output
@@ -815,8 +816,6 @@ multiverse.compare.group <- function(l_res,
                                      n_ind){
   
   #--- Reference model info
-  # TODO this will have to account for nonconvergence
-  # n_ind <- length(ref_model$fit)
   n_var <- ref_model$n_vars_total
   
   # indices for temporal and contemporaneous
@@ -825,13 +824,17 @@ multiverse.compare.group <- function(l_res,
   
   #--- Adjacency Matrix
   ## Find group effects adjacency matrix
-  ref_groupedge <- ifelse(ref_model$path_counts == n_ind, 1, 0)
+  # find n converged for reference model
+  n_ind_ref <- sum(unlist(lapply(ref_model$path_est_mats, is.double)))
+  
+  ref_groupedge <- ifelse(ref_model$path_counts == n_ind_ref, 1, 0)
   # ignore autoregressive coefs
   diag(ref_groupedge[, temp_ind]) <- rep(0, n_var/2)
   
   # Find group effects adjacency matrix differences
   l_ref_diff <- lapply(l_res, function(x){
-    tmp_groupedge <- ifelse(x$path_counts == n_ind, 1, 0)
+    n_ind_mv <- sum(unlist(lapply(x$path_est_mats, is.double)))
+    tmp_groupedge <- ifelse(x$path_counts == n_ind_mv, 1, 0)
     diag(tmp_groupedge[, temp_ind]) <- rep(0, n_var/2)
     diff_groupedge <- ref_groupedge - tmp_groupedge
     return(diff_groupedge)
@@ -841,7 +844,9 @@ multiverse.compare.group <- function(l_res,
   # Count occurrence of each group effect
   ## list of adjacency matrices
   l_adjacency <- lapply(l_res, function(x){
-    tmp_groupedge <- ifelse(x$path_counts == n_ind, 1, 0)
+    n_ind_mv <- sum(unlist(lapply(x$path_est_mats, is.double)))
+    tmp_groupedge <- ifelse(x$path_counts == n_ind_mv, 1, 0)
+    diag(tmp_groupedge[, temp_ind]) <- rep(0, n_var/2)
     return(tmp_groupedge)
   }
   )
@@ -878,7 +883,7 @@ multiverse.compare.subgroup <- function(l_res,
   
   #--- Number of subgroups
   l_n_sub <- lapply(l_res, function(x){
-    return(length(x$path_counts_sub))
+    return(length(unique(x$fit$sub_membership)))
   }
   )
   
@@ -914,13 +919,14 @@ multiverse.compare.subgroup <- function(l_res,
 
 
 multiverse.compare.individual <- function(l_res,
-                                          ref_model){
+                                          ref_model,
+                                          n_ind){
   
   # browser()
   
   #--- Reference model 
-  n_ind <- length(ref_model$data)
-  n_var <- ref_model$n_vars_total
+  n_ind <- length(ref_model$path_est_mats)
+  n_var <- ref_model$n_lagged + ref_model$n_endog
   
   # indices for temporal and contemporaneous
   temp_ind <- 1:(n_var/2)
@@ -933,18 +939,33 @@ multiverse.compare.individual <- function(l_res,
   #--- Adjacency matrix
   # ignore autoregressive effects
   ref_adj_mats <- lapply(ref_path_est_mats, function(x){
-    tmp <- ifelse(x != 0, 1, 0)
-    diag(tmp[, temp_ind]) <- rep(0, n_var/2)
-    return(tmp)
+    if(!is.double(x)){
+      NA
+    }
+    else{
+      tmp <- ifelse(x != 0, 1, 0)
+      diag(tmp[, temp_ind]) <- rep(0, n_var/2)
+      return(tmp)
+    }
   })
   
   #--- Density
   ref_dens_temp <- lapply(ref_path_est_mats, function(x){
-    abs_sum(x[, temp_ind])
+    if(!is.double(x)){
+      NA
+    }
+    else{
+      abs_sum(x[, temp_ind])
+    }
   })
   
   ref_dens_cont <- lapply(ref_path_est_mats, function(x){
-    abs_sum(x[, cont_ind])
+    if(!is.double(x)){
+      NA
+    }
+    else{
+      abs_sum(x[, cont_ind])
+    }
   })
   
   #--- Fit indices
@@ -954,7 +975,12 @@ multiverse.compare.individual <- function(l_res,
   
   #--- Centrality
   ref_outstrength <- lapply(ref_path_est_mats, function(x){
-    colSums(abs(x))
+    if(!is.double(x)){
+      NA
+    }
+    else{
+      colSums(abs(x))
+    }
   })
   
   ########################
@@ -972,12 +998,18 @@ multiverse.compare.individual <- function(l_res,
   # Values should be >= 0 & <= 1
   # inspired by https://github.com/aweigard/GIMME_AR_simulations/blob/master/analyze_recovery_Balanced.R
   # 1 means implausible value somewhere in psi matrix
-  l_implausible <- lapply(l_res, function(x){
-    unlist(lapply(x$path_est_mats, function(y){
-      sum(ifelse(any(diag(y[,temp_ind]) < 0 | diag(y[,temp_ind]) > 1) , 1, 0))
-    }))
-  })
-  sum_implausible <- sapply(l_implausible, sum)
+  # l_implausible <- lapply(l_res, function(x){
+  #   unlist(lapply(x$path_est_mats, function(y){
+  #     if(!is.double(y)){
+  #       NA
+  #     }
+  #     else{
+  #       sum(ifelse(any(diag(y[,temp_ind]) < 0 | diag(y[,temp_ind]) > 1) , 1, 0))
+  #     }
+  #     
+  #   }))
+  # })
+  # sum_implausible <- sapply(l_implausible, sum)   # this might throw an error if parts are NA
   
   
   ########################
@@ -1007,9 +1039,15 @@ multiverse.compare.individual <- function(l_res,
     ## adjacency matrices
     # ignore AR coefs
     tmp_adj_mats <- lapply(x$path_est_mats, function(y){
-      tmp <- ifelse(y != 0, 1, 0)
-      diag(tmp[, temp_ind]) <- rep(0, n_var/2)
-      return(tmp)
+      if(!is.double(y)){
+        NA
+      }
+      else{
+        tmp <- ifelse(y != 0, 1, 0)
+        diag(tmp[, temp_ind]) <- rep(0, n_var/2)
+        return(tmp)
+      }
+
     })
     l_adj <- Map('-', ref_adj_mats, tmp_adj_mats)
     lapply(l_adj, function(y){as.matrix(y)})
@@ -1018,9 +1056,15 @@ multiverse.compare.individual <- function(l_res,
   # Return adjacency matrix for each individual
   l_adj <- lapply(l_res, function(x){
     tmp_adj_mats <- lapply(x$path_est_mats, function(y){
-      tmp <- ifelse(y != 0, 1, 0)
-      diag(tmp[, temp_ind]) <- rep(0, n_var/2)
-      return(tmp)
+      if(!is.double(y)){
+        NA
+      }
+      else{
+        tmp <- ifelse(y != 0, 1, 0)
+        diag(tmp[, temp_ind]) <- rep(0, n_var/2)
+        return(tmp)
+      }
+
     })
     return(tmp_adj_mats)
   })
@@ -1028,7 +1072,10 @@ multiverse.compare.individual <- function(l_res,
   #--- Difference/bias path estimates
   l_diff_ests <- lapply(l_res, function(x){
     l_est <- Map('-', ref_path_est_mats, x$path_est_mats)
-    l_est <- lapply(l_est, function(y){as.matrix(y)})
+    l_est <- lapply(l_est, function(y){
+      as.matrix(y)})
+    # filter entries that are NA
+    l_est <- Filter(function(entry) is.double(entry), l_est)
     simplify2array(l_est)
   })
   
@@ -1036,14 +1083,24 @@ multiverse.compare.individual <- function(l_res,
   #--- Density
   l_diff_dens_temp <- lapply(l_res, function(x){
     tmp_denstemp <- lapply(x$path_est_mats, function(y){
-      abs_sum(y[, temp_ind])
+      if(!is.double(y)){
+        NA
+      }
+      else{
+        abs_sum(y[, temp_ind])        
+      }
     })
     unlist(Map('-', ref_dens_temp, tmp_denstemp))
   })
   
   l_diff_dens_cont <- lapply(l_res, function(x){
     tmp_denscont <- lapply(x$path_est_mats, function(y){
-      abs_sum(y[, cont_ind])
+      if(!is.double(y)){
+        NA
+      }
+      else{
+        abs_sum(y[, cont_ind])
+      }
     })
     unlist(Map('-', ref_dens_cont, tmp_denscont))
   })
@@ -1058,14 +1115,25 @@ multiverse.compare.individual <- function(l_res,
   # compute outstrength
   l_cent <- lapply(l_res, function(x){
     tmp_outstrength <- lapply(x$path_est_mats, function(y){
-      colSums(abs(y))
+      if(!is.double(y)){
+        NA
+      }
+      else{
+        colSums(abs(y))
+      }
+      
     })
   })
   
   # compute difference
   l_diff_cent <- lapply(l_res, function(x){
     tmp_outstrength <- lapply(x$path_est_mats, function(y){
-      colSums(abs(y))
+      if(!is.double(y)){
+        NA
+      }
+      else{
+        colSums(abs(y))
+      }
     })
     Map('-', ref_outstrength, tmp_outstrength)
   })
@@ -1082,8 +1150,16 @@ multiverse.compare.individual <- function(l_res,
       max_cont_ref <- which.max(ref_outstrength[[j]][cont_ind])
       max_cont_mv <- which.max(l_cent[[i]][[j]][cont_ind])
       central_node_identical[[i]][[j]] <- list()
-      central_node_identical[[i]][[j]]$temp_identical <- names(max_temp_ref) == names(max_temp_mv)
-      central_node_identical[[i]][[j]]$cont_identical <- names(max_cont_ref) == names(max_cont_mv)
+      central_node_identical[[i]][[j]]$temp_identical <- if(!is.null(max_temp_ref) & !is.null(max_temp_mv)){
+        names(max_temp_ref) == names(max_temp_mv)}
+      else{
+        NA
+      }
+      central_node_identical[[i]][[j]]$cont_identical <- if(!is.null(max_cont_ref) & !is.null(max_cont_mv)){
+        names(max_cont_ref) == names(max_cont_mv)}
+      else{
+        NA
+      }
     }
   }
   
@@ -1107,9 +1183,12 @@ multiverse.compare.individual <- function(l_res,
   #--- Adjacency matrix
   mean_diff_adj <- lapply(l_diff_adj, function(x){
     l_tmp <- list()
-    l_tmp$diff_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-    l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i)
-    l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i)
+    # Filter entries that are NA (and therefore saved as 1x1 integer)
+    x <- Filter(function(entry) is.double(entry), x)
+      l_tmp$diff_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
+      l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+      l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+
     return(l_tmp)
   })
   
@@ -1118,18 +1197,18 @@ multiverse.compare.individual <- function(l_res,
   mean_diff_ests <- lapply(l_diff_ests, function(x){
     l_tmp <- list()
     # mean_mat <- apply(simplify2array(x), 1:2, mean)
-    l_tmp$mean_nonzero_diff_edge_i <- mean(abs(x[which(x != 0, arr.ind = TRUE)]))
-    l_tmp$med_nonzero_diff_edge_i <- stats::median(abs(x[which(x != 0, arr.ind = TRUE)]))
-    l_tmp$mean_diff_edge_i <- mean(abs(x))
-    l_tmp$med_diff_edge_i <- stats::median(abs(x))
+    l_tmp$mean_nonzero_diff_edge_i <- abs_mean(x[which(x != 0, arr.ind = TRUE)])
+    l_tmp$med_nonzero_diff_edge_i <- abs_med(x[which(x != 0, arr.ind = TRUE)])
+    l_tmp$mean_diff_edge_i <- abs_mean(x)
+    l_tmp$med_diff_edge_i <- abs_med(x)
     return(l_tmp)
   })
   
   #--- Densities
   mean_abs_diff_dens_temp <- sapply(l_diff_dens_temp, abs_mean)
   mean_abs_diff_dens_cont <- sapply(l_diff_dens_cont, abs_mean)
-  mean_diff_dens_temp <- sapply(l_diff_dens_temp, mean)
-  mean_diff_dens_cont <- sapply(l_diff_dens_cont, mean)
+  mean_diff_dens_temp <- sapply(l_diff_dens_temp, mean, na.rm = TRUE)
+  mean_diff_dens_cont <- sapply(l_diff_dens_cont, mean, na.rm = TRUE)
   
   
   
@@ -1146,27 +1225,29 @@ multiverse.compare.individual <- function(l_res,
   # difference across all centrality values
   mean_diff_cent <- lapply(l_diff_cent, function(x){
     l_tmp <- list()
-    diff_cent <- rowSums(simplify2array(x))
-    l_tmp$mean_diff_cent_i <- mean(abs(diff_cent))
-    l_tmp$med_diff_cent_i <- stats::median(abs(diff_cent))
+    # filter out NA
+    x <- Filter(function(entry) is.double(entry), x)
+    diff_cent <- rowSums(simplify2array(x), na.rm = TRUE)
+    l_tmp$mean_diff_cent_i <- abs_mean(diff_cent)
+    l_tmp$med_diff_cent_i <- abs_med(diff_cent)
     return(l_tmp)
   })
   
   # central node identical
   sum_temp_central_identical <- lapply(central_node_identical, function(x) 
     lapply(x, function(y) 
-      sum(unlist(y$temp_identical))))
+      sum(unlist(y$temp_identical), na.rm = TRUE)))
   sum_cont_central_identical <- lapply(central_node_identical, function(x) 
     lapply(x, function(y) 
-      sum(unlist(y$cont_identical))))
+      sum(unlist(y$cont_identical), na.rm = TRUE)))
   
-  sum_temp_central_identical <- sapply(sum_temp_central_identical, function(x) sum(unlist(x)))
-  sum_cont_central_identical <- sapply(sum_cont_central_identical, function(x) sum(unlist(x)))
+  sum_temp_central_identical <- sapply(sum_temp_central_identical, function(x) sum(unlist(x), na.rm = TRUE))
+  sum_cont_central_identical <- sapply(sum_cont_central_identical, function(x) sum(unlist(x), na.rm = TRUE))
   
   
   l_out <- tibble(
-    l_implausible_i = l_implausible,
-    sum_implausible_i = sum_implausible,
+    # l_implausible_i = l_implausible,
+    # sum_implausible_i = sum_implausible,
     # l_diff_nondir_adj_i = l_diff_nondir_adj,
     l_adj_i = l_adj, 
     l_diff_adj_i = l_diff_adj,
@@ -1188,6 +1269,7 @@ multiverse.compare.individual <- function(l_res,
   ) %>% 
     tidyr::unnest_wider(c(
                           # mean_diff_nondir_adj_i,
+                          # central_node_identical_i,
                           mean_diff_adj_i,
                           mean_diff_ests_i, 
                           mean_diff_cent_i,
@@ -1267,14 +1349,14 @@ matrix_summary <- function(l_matrix) {
 # Small helpers -----------------------------------------------------------
 
 abs_mean <- function(x){
-  mean(abs(x))
+  mean(abs(x), na.rm = TRUE)
 }
 abs_med <- function(x){
-  stats::median(abs(x))
+  stats::median(abs(x), na.rm = TRUE)
 }
 
 abs_sum <- function(x){
-  sum(abs(x))
+  sum(abs(x), na.rm = TRUE)
 }
 
 
