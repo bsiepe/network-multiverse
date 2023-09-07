@@ -6,7 +6,7 @@
 # p.con = proportion of paths that are contemporaneous (vs. lagged)
 # nvar = number of variables in the time series
 # AR = average strength of autoregressive realtions (SD=.10)
-# dens = density of network (not including autoregressive relations)
+# dens = density of  (not including autoregressive relations)
 # p.group = proportion of relations at the group (vs. individual) level
 # con.b = average strength of contemporaneous relations (SD=.10)
 # lag.b = average strength of cross-lagged relations (SD=.10)
@@ -498,11 +498,17 @@ multiverse.network <- function(mv_res,
                                cutoff = NULL,    # only include effects with certain proportion of occurrence? 
                                split_graph = TRUE, # show temporal and contemporaneous seperated 
                                n_ind = NULL,      # specify number of individuals manually for now
+                               endogeneous = FALSE,   # is there an endogeneous var? currently allows only 1 endog.
+                               temp_labels = NULL, # labels for temporal network
+                               cont_labels = NULL, # labels for contemporaneous network
+                               # pct = FALSE,      # use percentages for plotting
                                ...){              # additional arguments to be passed to qgraph 
+  # browser()
   
   # Count matrix across iterations
   # congratulations to myself for this unwieldy code
   count_mat <- Reduce('+', lapply(mv_res$l_adj_i, function(x){
+    x <- Filter(function(entry) is.double(entry), x)
     as.matrix(Reduce('+', x))
   }))
 
@@ -522,10 +528,31 @@ multiverse.network <- function(mv_res,
   
   # Split matrix based on lag vs. non-lagged
   if(is.null(n_lagged)){
-    n_lagged <-  ncol(prop_mat)/2
+    # round down for odd numbers
+    n_lagged <-  floor(ncol(prop_mat)/2)
   }
   temp_mat <- prop_mat[, 1:n_lagged]
   cont_mat <- prop_mat[, (n_lagged + 1): ncol(prop_mat)]
+  
+  # Account for endogenous variable
+  # insert zero row for the endogeneous variabl
+  if(isTRUE(endogeneous)){
+    cont_mat <- rbind(cont_mat, rep(0, n_lagged + 1))
+    if(is.null(temp_labels)){
+      temp_labels <- colnames(cont_mat)[-length(cont_mat)]
+    }
+  }
+  if(is.null(cont_labels)){
+    cont_labels <- colnames(cont_mat)
+  }
+  if(is.null(temp_labels)){
+    temp_labels <- colnames(cont_mat)
+  }
+  
+  #--- Compute percentage labels
+  pct_labels_temp <- paste0(round(t(temp_mat)*100,1), " %")
+  
+  pct_labels_cont <- paste0(round(t(cont_mat)*100,1), " %")
   
   # Plot
   if(isTRUE(split_graph)){
@@ -536,13 +563,13 @@ multiverse.network <- function(mv_res,
       input = t(temp_mat), 
       layout       = "circle",
       lty = 1,
-      edge.labels  = TRUE,
+      edge.labels  = pct_labels_temp,
       theme = "colorblind",
       negDashed = TRUE,
       parallelEdge = TRUE,
       fade         = FALSE,
       # arrows       = FALSE,
-      labels = colnames(cont_mat),    # so that this does not show "lag" in name
+      labels = temp_labels,    # so that this does not show "lag" in name
       # title.cex = 2, 
       # label.cex    = 1.25,
       title = "Temporal",
@@ -554,13 +581,13 @@ multiverse.network <- function(mv_res,
       input = t(cont_mat), 
       layout  = "circle",
       lty = 1,
-      edge.labels  = TRUE,
+      edge.labels  = pct_labels_cont,
       theme = "colorblind",
       negDashed = TRUE,
       parallelEdge = TRUE,
       fade = FALSE,
       # arrows   = FALSE,
-      labels = colnames(cont_mat),
+      labels = cont_labels,
       # title.cex = 2,
       # label.cex = 1.25,
       title = "Contemporaneous",
@@ -777,14 +804,13 @@ plot_specification <- function(mv_res,
 #' @return A tibble containing the comparison results at different levels: group-level, subgroup-level, and individual-level comparison along with condition information for each specification.
 #' @export
 multiverse.compare <- function(l_res,
-                               ref_model,
-                               n_ind
+                               ref_model
 ){
   # browser()
   
   #---- Compare Group-Level
   comp_group <- multiverse.compare.group(
-    l_res = l_res, ref_model = ref_model, n_ind = n_ind
+    l_res = l_res, ref_model = ref_model
   )
   
   #---- Compare Subgroup-Level
@@ -794,7 +820,7 @@ multiverse.compare <- function(l_res,
   
   #---- Compare Individual Solutions
   comp_ind <- multiverse.compare.individual(
-    l_res = l_res, ref_model = ref_model, n_ind = n_ind
+    l_res = l_res, ref_model = ref_model
   )   
   
   #--- Output
@@ -812,8 +838,7 @@ multiverse.compare <- function(l_res,
 
 
 multiverse.compare.group <- function(l_res,
-                                     ref_model,
-                                     n_ind){
+                                     ref_model){
   
   #--- Reference model info
   n_var <- ref_model$n_vars_total
@@ -826,6 +851,11 @@ multiverse.compare.group <- function(l_res,
   ## Find group effects adjacency matrix
   # find n converged for reference model
   n_ind_ref <- sum(unlist(lapply(ref_model$path_est_mats, is.double)))
+  
+  # Find converged for multiverse
+  n_ind <- lapply(l_res, function(x){
+    sum(unlist(lapply(x$path_est_mats, is.double)))
+  })
   
   ref_groupedge <- ifelse(ref_model$path_counts == n_ind_ref, 1, 0)
   # ignore autoregressive coefs
@@ -856,8 +886,10 @@ multiverse.compare.group <- function(l_res,
   l_heterogeneity <- list()
   for(i in 1:length(l_adjacency)){
     # calculate number of estimated edges, group + individual
-    l_adjacency_ind <- ifelse(l_res[[i]]$path_counts > 0, 1, 0)
-    l_heterogeneity[[i]] <- sum(l_adjacency[[i]])/sum(l_adjacency_ind)
+    tmp_mat <- l_res[[i]]$path_counts
+    n_ind_mv <- sum(unlist(lapply(l_res[[i]]$path_est_mats, is.double)))
+    diag(tmp_mat[, temp_ind]) <- rep(0, n_var/2)
+    l_heterogeneity[[i]] <- sum(tmp_mat[tmp_mat == n_ind_mv]) / sum(tmp_mat)
   }
   
   #--- Output
@@ -868,7 +900,8 @@ multiverse.compare.group <- function(l_res,
     heterogeneity_g = l_heterogeneity
   ) %>% 
     dplyr::mutate(ref_diff_g = as.list(ref_diff_g)) %>% 
-    tidyr::unnest(n_ind)
+    tidyr::unnest(n_ind) %>% 
+    tidyr::unnest(heterogeneity_g)
   
   return(l_out)
 }
@@ -919,14 +952,15 @@ multiverse.compare.subgroup <- function(l_res,
 
 
 multiverse.compare.individual <- function(l_res,
-                                          ref_model,
-                                          n_ind){
+                                          ref_model){
   
   # browser()
   
   #--- Reference model 
   n_ind <- length(ref_model$path_est_mats)
-  n_var <- ref_model$n_lagged + ref_model$n_endog
+  # n_var <- ref_model$n_lagged + ref_model$n_endog
+  # the former version did not include TimeOfDay
+  n_var <- ref_model$n_vars_total
   
   # indices for temporal and contemporaneous
   temp_ind <- 1:(n_var/2)
