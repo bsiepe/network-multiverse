@@ -81,7 +81,7 @@ mv_res_pers <- mvgimme::multiverse.gimme(data = here("data/wright_2019/individua
                           save_output = TRUE)
 toc()
 
-saveRDS(mv_res_pers, file = here("output/mv_personality/mv_res_pers.RDS"))
+# saveRDS(mv_res_pers, file = here("output/mv_personality/mv_res_pers2.RDS"))
 mv_res_pers <- readRDS(here("output/mv_personality/mv_res_pers2.RDS"))
 
 ```
@@ -93,6 +93,7 @@ mv_res_pers <- readRDS(here("output/mv_personality/mv_res_pers2.RDS"))
 ## Emotion Dataset
 
 ```{r multiverse-personality}
+# TODO CHANGE THIS TO THE NEW SPECIFICATION WITH .51
 mv_res_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutput"),
                                          header = TRUE,
                                          sep = ",",
@@ -113,8 +114,8 @@ mv_res_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutp
 
 
 # 248908.521 sec
-# saveRDS(mv_res_emot, file = here("output/mv_emotion/mv_res_emot_new.RDS"))
-mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot_new.RDS"))
+# saveRDS(mv_res_emot, file = here("output/mv_emotion/mv_res_emot_new51.RDS"))
+mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot_new51.RDS"))
 
 
 ```
@@ -148,9 +149,9 @@ saveRDS(comp_test, here("Network-Multiverse/data/comp_test_pers.RDS"))
 
 
 tic()
-comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers, n_ind = 94)
+comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers)
 toc() # 1439.33 sec elapsed
-saveRDS(comp_pers, here("output/mv_personality/comp_pers.RDS"))
+# saveRDS(comp_pers, here("output/mv_personality/comp_pers.RDS"))
 comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
 ```
 
@@ -265,11 +266,18 @@ prop.table(table(n_group_paths))
 Which group-level paths were found most often?
 ```{r}
 Reduce('+', comp_pers$adjacency_g)
-```
 
-Heterogeneity of the solution
-```{r}
+# Heterogeneity of reference fit
 summary(unlist(comp_pers$heterogeneity_g))
+
+# Heterogeneity of original fit (number of converged individuals)
+# divide by all effects
+all_effects <- ref_fit_pers_og$path_counts
+# set AR effects to zero
+diag(all_effects[,1:6]) <- 0  
+n_group_effects <- sum(all_effects[all_effects == 94]) 
+n_all_effects <- sum(all_effects)
+n_group_effects/n_all_effects
 ```
 
 
@@ -283,11 +291,20 @@ table(unlist(comp_pers$size_sub_s))
 
 
 #### Individual-Level
-Adjacency matrix differences, summed across all individuals within a specification.
-TODO account for absolute differences. 
+Difference in adjacency matrix:
 ```{r}
-comp_pers$sum_adj_diff <- lapply(comp_pers$l_diff_adj_i, function(x) sum(Reduce('+', x)))
-sd(abs(unlist(comp_pers$sum_adj_diff)))/94 
+summary(comp_pers$diff_adj_sum_mean_i)
+sd(comp_pers$diff_adj_sum_mean_i)
+```
+
+
+
+Adjacency matrix differences, summed across all individuals within a specification.
+TODO this does not account for contemporaneous 
+```{r}
+# OLD CODE, probably delete
+# comp_pers$sum_adj_diff <- lapply(comp_pers$l_diff_adj_i, function(x) sum(Reduce('+', x)))
+# sd(abs(unlist(comp_pers$sum_adj_diff)))/94 
   
 
 # Check if there are individuals for whom there was a greater difference
@@ -295,22 +312,26 @@ sd(abs(unlist(comp_pers$sum_adj_diff)))/94
 add_matrices <- function(matrix_list) {
   reduce_matrix <- matrix(0, nrow = nrow(matrix_list[[1]]), ncol = ncol(matrix_list[[1]]))
   for (matrix in matrix_list) {
-    reduce_matrix <- reduce_matrix + matrix
+    reduce_matrix <- reduce_matrix + abs(matrix)
   }
   reduce_matrix
 }
 
 # Use lapply to apply the custom function to each matrix name across all elements
+# Added contemporaneous indicator manually
 result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
-  add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]]))
+  add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]][,7:12]))
 })
 
 # calculate average difference
 avg_diff_adj <- sapply(result, function(x) sum(abs(x)))/3887
 summary(avg_diff_adj)
-sum(avg_diff_adj > 5)
+sum(avg_diff_adj > 4)
 
 ```
+
+
+
 
 
 Edge weight differences
@@ -321,6 +342,10 @@ sd(comp_pers$mean_nonzero_diff_edge_i, na.rm = TRUE)
 mean(comp_pers$mean_diff_edge_i)
 sd(comp_pers$mean_diff_edge_i)
 
+# compare against average non-zero edge weight in reference fit
+mean(unlist(lapply(ref_fit_pers_og$path_est_mats, function(x){
+  mean(abs(x[x != 0]))
+})), na.rm = TRUE)
 
 ```
 
@@ -391,10 +416,11 @@ mv_res_emot <- mv_res_emot[-ref_fit_ind]
 
 # Analyze
 tic()
-comp_emot <- multiverse.compare(mv_res_emot, ref_fit_emot_og, n_ind = 105)
-toc()  # 2040.35 sec elapsed
+comp_emot <- multiverse.compare(mv_res_emot, ref_fit_emot_og)
+toc()  # 1660.2 sec elapsed
 beepr::beep(6)
-saveRDS(comp_emot, here("output/mv_emotion/comp_emot.RDS"))
+# saveRDS(comp_emot, here("output/mv_emotion/comp_emot51.RDS"))
+comp_emot <- readRDS(here("output/mv_emotion/comp_emot51.RDS"))
 
 ```
 
@@ -457,6 +483,16 @@ Reduce('+', comp_emot$adjacency_g)
 Heterogeneity of the solution
 ```{r}
 summary(unlist(comp_emot$heterogeneity_g))
+
+# Heterogeneity of original fit (number of converged individuals)
+# divide by all effects
+all_effects <- ref_fit_emot_og$path_counts
+# set AR effects to zero
+diag(all_effects[,1:9]) <- 0  
+n_group_effects <- sum(all_effects[all_effects == 104]) 
+n_all_effects <- sum(all_effects)
+n_group_effects/n_all_effects
+
 ```
 
 
@@ -504,34 +540,12 @@ comp_emot %>%
 
 
 #### Individual-Level
-Adjacency matrix differences, summed across all individuals within a specification.
-TODO account for absolute differences. 
+Adjacency matrix differences
 ```{r}
-comp_emot$sum_adj_diff <- lapply(comp_emot$l_diff_adj_i, function(x) sum(Reduce('+', x)))
-sd(abs(unlist(comp_emot$sum_adj_diff)))/105
-  
-
-# Check if there are individuals for whom there was a greater difference
-# Custom function to add matrices element-wise
-add_matrices <- function(matrix_list) {
-  reduce_matrix <- matrix(0, nrow = nrow(matrix_list[[1]]), ncol = ncol(matrix_list[[1]]))
-  for (matrix in matrix_list) {
-    reduce_matrix <- reduce_matrix + matrix
-  }
-  reduce_matrix
-}
-
-# Use lapply to apply the custom function to each matrix name across all elements
-result <- lapply(names(comp_emot$l_diff_adj_i[[1]]), function(matrix_name) {
-  add_matrices(lapply(comp_emot$l_diff_adj_i, function(element) element[[matrix_name]]))
-})
-
-# calculate average difference
-avg_diff_adj <- sapply(result, function(x) sum(abs(x)))/3887
-summary(avg_diff_adj)
-sum(avg_diff_adj > 5)
-
+summary(comp_emot$diff_adj_sum_mean_i)
+sd(comp_emot$diff_adj_sum_mean_i)
 ```
+
 
 
 Edge weight differences
@@ -542,6 +556,10 @@ sd(comp_emot$mean_nonzero_diff_edge_i, na.rm = TRUE)
 mean(comp_emot$mean_diff_edge_i)
 sd(comp_emot$mean_diff_edge_i)
 
+# compare against average non-zero edge weight in reference fit
+mean(unlist(lapply(ref_fit_emot_og$path_est_mats, function(x){
+  mean(abs(x[x != 0]))
+})), na.rm = TRUE)
 
 ```
 
@@ -634,11 +652,11 @@ n_excels_levels <- c("strict", "medium", "liberal")
 
 Specification curve plot adjacency matrix
 ```{r}
-plot_out_adj_pers <- plot_outcome(mv_res = comp_pers, var = sum_adj_diff,
-                                  y_label = "Sum of Adjacency Matrix Differences") +
+plot_out_adj_pers <- plot_outcome(mv_res = comp_pers, var = diff_adj_sum_mean_i,
+                                  y_label = "Mean of Adjacency Matrix Differences") +
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
-plot_spec_adj_pers <- plot_specification(mv_res = comp_pers, var = sum_adj_diff)+
+plot_spec_adj_pers <- plot_specification(mv_res = comp_pers, var = diff_adj_sum_mean_i)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
 
@@ -648,6 +666,9 @@ spec_plot_adj_pers <- cowplot::plot_grid(plot_out_adj_pers, plot_spec_adj_pers,
                    rel_heights = c(0.5,1))
 ggsave("spec_plot_adj_pers.pdf", spec_plot_adj_pers, path = here("figures/"),
        device = "pdf", height = 16, width = 16)
+rm(plot_out_adj_pers)
+rm(plot_spec_adj_pers)
+rm(spec_plot_adj_pers)
 
 ```
 
@@ -684,6 +705,41 @@ ggsave("spec_plot_abs_dens_pers.pdf", spec_plot_dens_pers, path = here("figures/
 
 ```
 
+Use percentage deviation from original fit
+```{r}
+ref_dens_cont <- lapply(ref_fit_pers_og$path_est_mats, function(x){
+    if(!is.double(x)){
+      NA
+    }
+    else{
+      abs_sum(x[, 6:12])
+    }
+  })
+mean_ref_dens_cont<- mean(unlist(ref_dens_cont), na.rm = TRUE)
+
+comp_pers$pct_diff_dens_cont <- (comp_pers$mean_diff_dens_cont_i / mean_ref_dens_cont)*100
+
+plot_out_dens_pers_pct <- plot_outcome(mv_res = comp_pers, 
+                              var = pct_diff_dens_cont,
+                              y_label = "% Density Difference") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+plot_spec_dens_pers_pct <- plot_specification(mv_res = comp_pers, var = pct_diff_dens_cont)+
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+
+# Combine Plots
+spec_plot_dens_pers <- cowplot::plot_grid(plot_out_dens_pers_pct, plot_spec_dens_pers_pct, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_dens_pers_pct.pdf", spec_plot_dens_pers, path = here("figures/"),
+       device = "pdf", height = 16, width = 16)
+
+rm(plot_out_dens_pers_pct)
+rm(plot_spec_dens_pers_pct)
+rm(spec_plot_dens_pers)
+
+```
 
 
 ### Supplement
@@ -693,11 +749,14 @@ ggsave("spec_plot_abs_dens_pers.pdf", spec_plot_dens_pers, path = here("figures/
 
 Specification curve plot adjacency matrix
 ```{r}
-plot_out_adj_emot <- plot_outcome(mv_res = comp_emot, var = sum_adj_diff,
-                                  y_label = "Sum of Adjacency Matrix Differences") +
+# for correct colors
+sub_cuts <- c(.51, .60, .75, .80)
+
+plot_out_adj_emot <- plot_outcome(mv_res = comp_emot, var = diff_adj_sum_mean_i,
+                                  y_label = "Mean of Adjacency Matrix Differences") +
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
-plot_spec_adj_emot <- plot_specification(mv_res = comp_emot, var = sum_adj_diff)+
+plot_spec_adj_emot <- plot_specification(mv_res = comp_emot, var = diff_adj_sum_mean_i)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
 
@@ -708,16 +767,25 @@ spec_plot_adj_emot <- cowplot::plot_grid(plot_out_adj_emot, plot_spec_adj_emot,
 ggsave("spec_plot_adj_emot.pdf", spec_plot_adj_emot, path = here("figures/"),
        device = "pdf", height = 16, width = 16)
 
+rm(plot_out_adj_emot)
+rm(plot_spec_adj_emot)
+rm(spec_plot_adj_emot)
 ```
 
 
 Network multiverse plot
 ```{r}
-# TODO add better legend/node labels here
+# add better legend/node labels here
+temp_labels <- c("HighCorr\nPositive", "HighCorr\nNegative", "Enthusiastic",
+                 "Relaxed", "Sad", "Nervous", "Stressed", "MWoccur",
+                 "Emotion\nChronometry")
+cont_labels <- c(temp_labels, "TimeofDay")
+
 pdf(here("figures/mv_net_emot.pdf"), width = 8, height = 4)
 multiverse.network(comp_emot, cutoff = .05, 
                    title.cex = 1, label.cex = 1.2, 
-                   n_ind = 105)
+                   n_ind = 105, endogeneous = TRUE, 
+                   temp_labels = temp_labels, cont_labels = cont_labels)
 dev.off()
 
 ```
@@ -725,6 +793,10 @@ dev.off()
 
 Specification curve plot density
 ```{r}
+# for correct colors
+sub_cuts <- c(.51, .60, .75, .80)
+
+
 plot_out_dens_emot <- plot_outcome(mv_res = comp_emot, 
                               var = mean_diff_dens_cont_i,
                               y_label = "Density Difference") +
@@ -744,6 +816,46 @@ ggsave("spec_plot_abs_dens_emot.pdf", spec_plot_dens_emot, path = here("figures/
 rm(plot_out_dens_emot)
 rm(plot_spec_dens_emot)
 rm(spec_plot_dens_emot)
+```
+
+Use percentage deviation from original fit
+```{r}
+# for correct colors
+sub_cuts <- c(.51, .60, .75, .80)
+
+# TODO DO I COUNT TIMEOFDAY OR NOT?
+ref_dens_cont <- lapply(ref_fit_emot_og$path_est_mats, function(x){
+    if(!is.double(x)){
+      NA
+    }
+    else{
+      abs_sum(x[, 9:19])
+    }
+  })
+mean_ref_dens_cont<- mean(unlist(ref_dens_cont), na.rm = TRUE)
+
+comp_emot$pct_diff_dens_cont <- (comp_emot$mean_diff_dens_cont_i / mean_ref_dens_cont)*100
+
+plot_out_dens_emot_pct <- plot_outcome(mv_res = comp_emot, 
+                              var = pct_diff_dens_cont,
+                              y_label = "% Density Difference") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+plot_spec_dens_emot_pct <- plot_specification(mv_res = comp_emot, var = pct_diff_dens_cont)+
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)))
+
+# Combine Plots
+spec_plot_dens_emot <- cowplot::plot_grid(plot_out_dens_emot_pct, plot_spec_dens_emot_pct, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_dens_emot_pct.pdf", spec_plot_dens_emot, path = here("figures/"),
+       device = "pdf", height = 16, width = 16)
+
+rm(plot_out_dens_emot_pct)
+rm(plot_spec_dens_emot_pct)
+rm(spec_plot_dens_emot_pct)
+
 ```
 
 
