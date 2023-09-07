@@ -32,11 +32,11 @@ Maybe also different sparsity levels?
 ```{r sim-settings}
 # sample_sizes <- c(50, 100, 200)
 # For testing only:
-# sample_sizes <- c(30, 80)
-sample_sizes <- c(30)
+sample_sizes <- c(30, 80)
+# sample_sizes <- c(30)
 ar <- c(.2)
-# ind_a <- c(.15, .40)
-ind_a <- c(.15)
+ind_a <- c(.15, .40)
+# ind_a <- c(.15)
 ind_phi <- c(.05, .25)
 replications <- 500
 
@@ -118,11 +118,12 @@ sim_generate <- function(condition,
   ind_phi <- condition$ind_phi
   
   # Create matrix list depending on AR effect
-  # TODO check if I have to provide this as fixed object
   diag(a_1) <- rep(ar, 6)
   a_2 <- a_1 + change_a
   a_list <- list(a_1, a_2)
-  
+  tries <- 0
+  max_tries <- 100
+  while (tries < max_tries) {
     sim_dat <- try(simulateVARtest(
                                    A = a_list, 
                                    Phi = phi_list,
@@ -132,10 +133,18 @@ sim_generate <- function(condition,
                                    Obs = t,
                                    indA = ind_a,
                                    indPhi = ind_phi))
-  if(is(sim_dat, 'try-error')) browser()
+     if (!inherits(sim_dat, "try-error")) {
+        break
+    } else {
+        if (tries == max_tries) {
+            break
+        }
+    
+    }
+  }
   
   # save dgp
-  saveRDS(sim_dat, file = paste0("output/sim_dat_", n, "_", t,
+  saveRDS(sim_dat, file = paste0(here("output/simulation/sim_dat_"), n, "_", t,
                                    ".RDS"))
   
   # list of data matrices
@@ -187,7 +196,7 @@ sim_generate <- function(condition,
 #                    lvl = lvl,          
 #                    t = t,              
 #                    n.ind = n))
-#   if(is(sim_dat, 'try-error')) browser()
+#  
 #   
 #   # save dgp
 #   saveRDS(sim_dat, file = paste0("output/sim_dat_", n, "_", t,
@@ -237,7 +246,7 @@ sim_analyse_gimme_default <- function(condition, dat, fixed_objects = NULL){
                  subgroup = TRUE,
                  groupcutoff = .75,
                  subcutoff   = .75))
-  # if(is(gimme_res, 'try-error')) browser()
+ 
   
   ret <- list(path_counts = gimme_res[[1]]$path_counts,
               path_est_mats = gimme_res[[1]]$path_est_mats,
@@ -498,7 +507,7 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   bias_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_diff))
   bias_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_diff)) / (replications * (replications - 1)))
   
-  # browser()
+  
   # Output
   ret_mod <- c(ari_mean = ari_mean,
            ari_sd = ari_sd,
@@ -532,24 +541,25 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
 # Execute Simulation
 
 ```{r}
+
 sim_res <- SimDesign::runSimulation(sim_design, 
-                                    replications = 2, 
+                                    replications = replications, 
                                     save_results = TRUE,
                                     generate = sim_generate, 
                                     analyse = list(
                                     gimme = sim_analyse_gimme_default, 
                                     liberal = sim_analyse_gimme_liberal, 
-                                    strict = sim_analyse_gimme_strict
-                                    # thresh = sim_analyse_gimme_threshold1
+                                    strict = sim_analyse_gimme_strict,
+                                    thresh = sim_analyse_gimme_threshold1
                                     ),
                                     # analyse = sim_analyse_gimme_liberal,
                                     summarise = sim_summarize, 
                                     # save = TRUE, 
                                     # save_seeds = TRUE,
-                                    packages = c("mvgimme"), 
+                                    packages = c("mvgimme", "here"), 
                                     fixed_objects = sim_pars,
                                     parallel = TRUE)
-beepr::beep(6)
+SimClean()
 
 # maybe try unname() on the aux_funs results
 ```
