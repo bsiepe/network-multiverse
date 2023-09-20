@@ -227,9 +227,9 @@ sim.gimme <- function(p.con,
 #'             indA      = 0.01, 
 #'             indPhi    = 0.01,
 #'             indPsi    = 0.00)
-#' @param A A matrix (for no subgroups) or list of A matrices, with slice # = # of subgroups. 
-#' @param Phi Phi matrix (for no subgroups) or list of Phi matrices, with slice # = # of subgroups.  
-#' @param Psi matrix (for no subgroups) or list of Psi matrices, with slice # = # of subgroups. 
+#' @param A A matrix (for no subgroups) or list of A matrices, with slice # = # of subgroups. Contemporaneous Effects.
+#' @param Phi Phi matrix (for no subgroups) or list of Phi matrices, with slice # = # of subgroups. Temporal Effects.
+#' @param Psi matrix (for no subgroups) or list of Psi matrices, with slice # = # of subgroups. Prediction Errors.
 #' @param subAssign Optional vector of length N that indicates which subgroup each individual is in. 
 #' @param N Number of indvidiuals.
 #' @param Obs Number of observations (T) per individual. Burn in of 400 is used to generate then discarded.  
@@ -246,16 +246,16 @@ sim.gimme <- function(p.con,
 #' @export simulateVAR
 
 simulateVARtest <- function(A         = NULL, 
-                        Phi       = NULL, 
-                        Psi       = NULL, 
-                        subAssign = NULL, 
-                        N         = NULL, 
-                        ASign     = "random",  
-                        PhiSign   = "random",  
-                        Obs       = NULL,
-                        indA      = 0.01, 
-                        indPhi    = 0.01,
-                        indPsi    = 0.00) {
+                            Phi       = NULL, 
+                            Psi       = NULL, 
+                            subAssign = NULL, 
+                            N         = NULL, 
+                            ASign     = "random",  
+                            PhiSign   = "random",  
+                            tp       = NULL,
+                            indA      = 0.01, 
+                            indPhi    = 0.01,
+                            indPsi    = 0.00) {
   
   # browser()
   
@@ -313,8 +313,8 @@ simulateVARtest <- function(A         = NULL,
   
   if(is.null(N))
     stop(paste0("ERROR: Please provide N for the number of individuals to generate"))
-  if(is.null(Obs))
-    stop(paste0("ERROR: Please provide Obs for the number of time points per person"))
+  if(is.null(tp))
+    stop(paste0("ERROR: Please provide tp for the number of time points per person"))
   
   ##### Data Generation ####
   
@@ -366,9 +366,9 @@ simulateVARtest <- function(A         = NULL,
           }
         }
       }
-        diag(ATemp) <- 0
+      diag(ATemp) <- 0
       
-        
+      
       if(indPhi>0){
         n.col.phi <- ncol(ATemp)
         n.row.phi <- nrow(ATemp)
@@ -410,11 +410,13 @@ simulateVARtest <- function(A         = NULL,
       
       negA <- solve(diag(vars)-ATemp) 
       
-      time  <- matrix(0, nrow = vars, ncol = Obs+400) # 400 burn-in observations
+      time  <- matrix(0, nrow = vars, ncol = tp+400) # 400 burn-in observations
       
-      time1 <- matrix(0, nrow = vars, ncol = Obs+400)
+      time1 <- matrix(0, nrow = vars, ncol = tp+400)
       
-      noise <- negA %*% t(MASS::mvrnorm(n = (Obs+400),rep(0,vars),PsiTemp, empirical = TRUE))
+      
+      # BS: Gates et al. 2017, Eq. 3
+      noise <- negA %*% t(MASS::mvrnorm(n = (tp+400),rep(0,vars),PsiTemp, empirical = TRUE))
       # BS: this throws an non-conformable error if PsiTemp is not properly defined
       
       time[,1] <- noise[,1]
@@ -423,19 +425,20 @@ simulateVARtest <- function(A         = NULL,
       
       time[,2]  <- time1[,1]
       
-      for (t in 2:(Obs+400)){
+      # BS: Gates et al. 2017, Eq. 3
+      for (t in 2:(tp+400)){
         time1[,t]  <- negA %*% PhiTemp %*% time[,(t)] + noise[,t]
-        if (t<(Obs+400))
+        if (t<(tp+400))
           time[,(t+1)] <- time1[,t]
       }
       go <- 0
       for (c in 1:length(time[,1])){
         adf_result <- suppressWarnings(tryCatch({aTSA::adf.test(time[c, ], out = FALSE)},
-                               error = function(e) NA))       # BS: changed this
+                                                error = function(e) NA))       # BS: changed this
         if(adf_result$type3[1,3]>0.05 || 
            is.na(adf_result$type3[1,3])
            ||
-           sum(abs(time[c, 400:(Obs+400)])) > 10000)    # BS: add check for large values of timeseries
+           sum(abs(time[c, 400:(tp+400)])) > 10000)    # BS: add check for large values of timeseries
           go <- go + 1
         counter <- sum(counter, 1)
       }
@@ -444,7 +447,7 @@ simulateVARtest <- function(A         = NULL,
       Ind.nonstation <- append(Ind.nonstation, ind)
       writeLines(paste0('WARNING: No Stationary Time Series Data Generated for Individual:', ind))
     } else {
-      dataList[[ind]] <- t(time[,401:(400+Obs)]) 
+      dataList[[ind]] <- t(time[,401:(400+tp)]) 
       names(dataList)[ind]<- paste0('ind', ind)
     }
   }
@@ -458,7 +461,6 @@ simulateVARtest <- function(A         = NULL,
               indList = indList))
   
 }
-
 
 
 
@@ -535,7 +537,7 @@ multiverse.network <- function(mv_res,
   cont_mat <- prop_mat[, (n_lagged + 1): ncol(prop_mat)]
   
   # Account for endogenous variable
-  # insert zero row for the endogeneous variabl
+  # insert zero row for the endogeneous variable
   if(isTRUE(endogeneous)){
     cont_mat <- rbind(cont_mat, rep(0, n_lagged + 1))
     if(is.null(temp_labels)){
@@ -556,8 +558,8 @@ multiverse.network <- function(mv_res,
   
   # Plot
   if(isTRUE(split_graph)){
-    par(mfrow = c(1,2))
-    
+    # par(mfrow = c(1,2))
+    # Uncomment this if layout should be done automatically
     # Temporal
     qgraph::qgraph(
       input = t(temp_mat), 
@@ -567,7 +569,6 @@ multiverse.network <- function(mv_res,
       theme = "colorblind",
       negDashed = TRUE,
       parallelEdge = TRUE,
-      fade         = FALSE,
       # arrows       = FALSE,
       labels = temp_labels,    # so that this does not show "lag" in name
       # title.cex = 2, 
@@ -585,7 +586,6 @@ multiverse.network <- function(mv_res,
       theme = "colorblind",
       negDashed = TRUE,
       parallelEdge = TRUE,
-      fade = FALSE,
       # arrows   = FALSE,
       labels = cont_labels,
       # title.cex = 2,
@@ -607,7 +607,6 @@ multiverse.network <- function(mv_res,
       edge.labels  = TRUE,
       edge.color   = "blue",
       parallelEdge = TRUE,
-      fade         = FALSE,
       # arrows       = FALSE,
       labels       = 
         colnames(prop_mat)[(n_lagged+1):(ncol(prop_mat))],
