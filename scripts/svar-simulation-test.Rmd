@@ -1,0 +1,310 @@
+---
+title: "check_aux_funs.Rmd"
+author: "Björn Siepe"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Check the correct behavior of data-generating functions. 
+# Simulating data for GIMME
+
+```{r}
+source("scripts/aux_funs.R")
+library(SimDesign)
+library(mvgimme)
+library(tidyverse)
+set.seed(35037)
+```
+
+
+```{r sim-settings}
+# sample_sizes <- c(50, 100, 200)
+# For testing only:
+# sample_sizes <- c(30, 80)
+n_ind <- c(80)
+ar <- c(.2)
+ind_a <- c(.15, .40)
+# ind_a <- c(.15)
+ind_phi <- c(.05, .25)
+replications <- 500
+
+sim_design <- SimDesign::createDesign(n_ind = n_ind,
+                                      ar = ar,
+                                      ind_a = ind_a,
+                                      ind_phi = ind_phi)
+
+
+# TODO double check if this works with change_phi and change_a
+a_1 <- matrix(c(
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.25, 0.40, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.15,
+  0.00, 0.00, 0.35, 0.00, 0.00, 0.00
+), nrow = 6, byrow = TRUE)
+
+change_a <- matrix(c(
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0, -0.01010176, -0.06727818, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.20420106,  0.00000000, 0, -0.04994893,
+  0, 0, -0.35000000,  0.00000000, 0,  0.00000000
+), nrow = 6, byrow = TRUE)
+
+phi_1 <- matrix(c(
+  ar, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, ar, 0.00, 0.00, 0.10, 0.00,
+  0.00, 0.00, ar, 0.00, 0.00, 0.20,
+  0.00, 0.00, 0.00, ar, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, ar, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, ar
+), nrow = 6, byrow = TRUE)
+change_phi <- matrix(c(
+  0.0299806, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.00000000,
+  0.0000000, 0.1384933, 0.0000000,  0.00000000,  0.2270527,  0.00000000,
+  0.0000000, 0.0000000, 0.2266066,  0.00000000,  0.0000000, -0.02793758,
+  0.0000000, 0.0000000, 0.0000000, -0.06865572,  0.0000000,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000, -0.1298429,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.05377093
+), nrow = 6, byrow = TRUE)
+phi_2 <- phi_1 + change_phi
+phi_list <- list(phi_1, phi_2)
+
+psi_mat <- matrix(data = rep(0, 36), nrow = 6, ncol = 6)
+diag(psi_mat) <- rep(1, 6)
+psi_list <- list(psi_mat, psi_mat)
+
+
+sim_pars <- list(
+  tp = 10000,
+  phi_list = phi_list,
+  a_1 = a_1,
+  psi_list = psi_list,
+  change_a = change_a
+)
+
+```
+
+Function:
+
+```{r}
+sim_generate <- function(condition, 
+                         fixed_objects = NULL){
+  
+  # obtain fixed parameters
+  SimDesign::Attach(fixed_objects)
+  
+  # obtain condition parameters
+  n_ind <- condition$n_ind
+  # number of individuals in each group (while accounting for odd numbers)
+  group_size <- floor(n_ind / 2)
+
+  # Create group indicators
+  group_ind <- c(rep(1, group_size), rep(2, n_ind - group_size))
+  ar <- condition$ar
+  ind_a <- condition$ind_a
+  ind_phi <- condition$ind_phi
+  
+  # Create matrix list depending on AR effect
+  diag(a_1) <- rep(ar, 6)
+  nvar <- ncol(a_1)
+  a_2 <- a_1 + change_a
+  a_list <- list(a_1, a_2)
+  tries <- 0
+  max_tries <- 100
+  while (tries < max_tries) {
+    tries <- tries + 1
+    sim_dat <- try(simulateVARtest(
+                                   A = a_list, 
+                                   Phi = phi_list,
+                                   Psi = psi_list,
+                                   subAssign = group_ind,
+                                   N = n_ind,
+                                   tp = tp,
+                                   indA = ind_a,
+                                   indPhi = ind_phi))
+     if (!inherits(sim_dat, "try-error")) {
+        break
+    } else {
+        if (tries == max_tries) {
+            break
+        }
+    
+    }
+  }
+  
+  # save dgp
+  # saveRDS(sim_dat, file = paste0(here("output/simulation/sim_dat_"), n_ind, "_", tp,
+  #                                  ".RDS"))
+  
+  # list of data matrices
+  l_dat <- lapply(sim_dat$dataList, function(x){
+    as.matrix(x, ncol = nvar)
+  })
+  
+  # list of edge weights
+  l_paths <- lapply(sim_dat$indList, function(x){
+    x$Paths
+  })
+  
+  # overall counts matrix
+  l_counts <- lapply(sim_dat$indList, function(x){
+    x$Adj
+  })
+  path_counts <- Reduce('+', l_counts)
+  
+  
+  dat <- list(dat = l_dat, 
+              ind_paths = l_paths, 
+              path_counts = path_counts, 
+              group_ind = group_ind)
+  # levels = sim_dat$levels))
+  
+  return(dat)
+}
+
+```
+
+
+
+Try it out:
+```{r}
+test <- sim_generate(condition = sim_design[1,], fixed_objects = sim_pars)
+
+
+
+# Without SimDesign wrapper
+n_ind <- 80
+# number of individuals in each group (while accounting for odd numbers)
+group_size <- floor(n_ind / 2)
+
+# Create group indicators
+group_ind <- c(rep(1, group_size), rep(2, n_ind - group_size))
+ar <- 0.2
+ind_a <- 0.15
+ind_phi <- 0.05
+  
+# Create matrix list depending on AR effect
+diag(a_1) <- rep(ar, 6)
+nvar <- ncol(a_1)
+a_2 <- a_1 + change_a
+a_list <- list(a_1, a_2)
+tries <- 0
+max_tries <- 100
+sim_dat <- try(simulateVARtest(
+                                   A = a_list, 
+                                   Phi = phi_list,
+                                   Psi = psi_list,
+                                   subAssign = group_ind,
+                                   N = n_ind,
+                                   tp = 1000,
+                                   indA = ind_a,
+                                   indPhi = ind_phi))
+
+# now with fewer time points, check if this is worse
+sim_dat_short <- try(simulateVARtest(
+                                   A = a_list, 
+                                   Phi = phi_list,
+                                   Psi = psi_list,
+                                   subAssign = group_ind,
+                                   N = n_ind,
+                                   tp = 100,
+                                   indA = ind_a,
+                                   indPhi = ind_phi))
+```
+
+
+Fit model to it:
+```{r}
+test_fit <- mvgimme::multiverse.gimme(test$dat,
+                          subgroup = TRUE)
+test_fit2 <- mvgimme::multiverse.gimme(sim_dat$dat,
+                          subgroup = TRUE)
+test_fit_short <- mvgimme::multiverse.gimme(sim_dat_short$dat,
+                          subgroup = TRUE)
+
+
+saveRDS(test_fit, file = "output/test_fit_gimme.RDS")
+```
+
+Evaluate the fit
+```{r}
+test$ind_paths 
+test_fit[[1]]$path_est_mats
+# compute difference between path estimates
+diff_fit <- Map('-', test$ind_paths, test_fit[[1]]$path_est_mats)
+
+# Compute difference in adjacency overall
+diff_adj <- test$path_counts - test_fit[[1]]$path_counts
+
+# there seem to be very strong differences in the contemporaneous matrix
+
+
+```
+
+Check individual adjacency differences
+```{r}
+test_adj <- lapply(test$ind_paths, function(x){
+  ifelse(x != 0, 1, 0)
+})
+
+test_fit_adj <- lapply(test_fit[[1]]$path_est_mats, function(x){
+  ifelse(x != 0, 1, 0)
+})
+
+diff_adj_ind <- Map('-', test_adj, test_fit_adj)
+
+```
+
+
+
+
+
+# Other simulation functions
+Adapted from https://github.com/aweigard/GIMME_AR_simulations/blob/master/simulate_data.R
+```{r}
+v <- 6
+
+sim_dat_new <- sim.gimme(p.con = .50, 
+          nvar = v,
+          AR = .20,
+          dens = .25,
+          p.group = .50,
+          con.b = .3,
+          lag.b = .2,
+          t = 3000,           # length of time series
+          n.ind = 40)
+
+# List of data only
+new_data <- lapply(sim_dat_new, function(x)
+  x$series)
+
+# Obtain path counts
+ind_adj <- lapply(sim_dat_new, function(x){
+  ifelse(x$paths != 0, 1, 0)
+})
+group_adj <- Reduce('+', ind_adj)
+
+
+```
+
+Fit
+```{r}
+fit_new <- mvgimme::multiverse.gimme(new_data,
+                          subgroup = TRUE)
+
+```
+
+Evaluate
+```{r}
+group_adj - fit_new[[1]]$path_counts
+
+
+
+```
+
+
+
+
