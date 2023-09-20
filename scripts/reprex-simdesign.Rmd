@@ -1,0 +1,498 @@
+---
+title: "reprex-simdesign"
+author: "Björn Siepe"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+This is a minimal reprex to reproduce the variable naming error with `SimDesign`. 
+
+# Preparations
+```{r}
+library(gimme)
+library(SimDesign)
+library(here)
+set.seed(35037)
+source(here::here("scripts/reprex-auxfuns.R"))
+```
+
+
+# Generate
+Create simulation design:
+```{r}
+# Number of individuals
+n_ind <- 41
+
+# Autoregressive effect
+ar <- .2
+
+# Probability of individual contemporaneous effect
+ind_a <- c(.15, .40)
+
+# Probability of individual temporal effect
+ind_phi <- c(.05, .25)
+
+# Sim repetitions 
+replications <- 500
+
+sim_design <- SimDesign::createDesign(n_ind = n_ind,
+                                      ar = ar,
+                                      ind_a = ind_a,
+                                      ind_phi = ind_phi)
+
+
+```
+
+Create fixed DGPs:
+```{r}
+# Contemporaneous matrix
+a_1 <- matrix(c(
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.25, 0.40, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.15,
+  0.00, 0.00, 0.35, 0.00, 0.00, 0.00
+), nrow = 6, byrow = TRUE)
+
+change_a <- matrix(c(
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0, -0.01010176, -0.06727818, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.00000000,  0.00000000, 0,  0.00000000,
+  0, 0,  0.20420106,  0.00000000, 0, -0.04994893,
+  0, 0, -0.35000000,  0.00000000, 0,  0.00000000
+), nrow = 6, byrow = TRUE)
+
+
+# Temporal matrix
+phi_1 <- matrix(c(
+  ar, 0.00, 0.00, 0.00, 0.00, 0.00,
+  0.00, ar, 0.00, 0.00, 0.10, 0.00,
+  0.00, 0.00, ar, 0.00, 0.00, 0.20,
+  0.00, 0.00, 0.00, ar, 0.00, 0.00,
+  0.00, 0.00, 0.00, 0.00, ar, 0.00,
+  0.00, 0.00, 0.00, 0.00, 0.00, ar
+), nrow = 6, byrow = TRUE)
+change_phi <- matrix(c(
+  0.0299806, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.00000000,
+  0.0000000, 0.1384933, 0.0000000,  0.00000000,  0.2270527,  0.00000000,
+  0.0000000, 0.0000000, 0.2266066,  0.00000000,  0.0000000, -0.02793758,
+  0.0000000, 0.0000000, 0.0000000, -0.06865572,  0.0000000,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000, -0.1298429,  0.00000000,
+  0.0000000, 0.0000000, 0.0000000,  0.00000000,  0.0000000,  0.05377093
+), nrow = 6, byrow = TRUE)
+phi_2 <- phi_1 + change_phi
+phi_list <- list(phi_1, phi_2)
+
+# White noise
+psi_mat <- matrix(data = rep(0, 36), nrow = 6, ncol = 6)
+diag(psi_mat) <- rep(1, 6)
+psi_list <- list(psi_mat, psi_mat)
+
+# Fixed parameters
+sim_pars <- list(
+  tp = 100,
+  phi_list = phi_list,
+  a_1 = a_1,
+  psi_list = psi_list,
+  change_a = change_a
+)
+```
+
+Create data:
+```{r}
+sim_generate <- function(condition, 
+                         fixed_objects = NULL){
+  
+  # obtain fixed parameters
+  SimDesign::Attach(fixed_objects)
+  
+  # obtain condition parameters
+  n_ind <- condition$n_ind
+  # number of individuals in each group (while accounting for odd numbers)
+  group_size <- floor(n_ind / 2)
+
+  # Create group indicators
+  group_ind <- c(rep(1, group_size), rep(2, n_ind - group_size))
+  ar <- condition$ar
+  ind_a <- condition$ind_a
+  ind_phi <- condition$ind_phi
+  
+  # Create matrix list depending on AR effect
+  diag(a_1) <- rep(ar, 6)
+  nvar <- ncol(a_1)
+  a_2 <- a_1 + change_a
+  a_list <- list(a_1, a_2)
+  
+  # Simulate data
+  tries <- 0
+  max_tries <- 100
+  while (tries < max_tries) {
+    tries <- tries + 1
+    sim_dat <- try(simulateVARtest(
+                                   A = a_list, 
+                                   Phi = phi_list,
+                                   Psi = psi_list,
+                                   subAssign = group_ind,
+                                   N = n_ind,
+                                   tp = tp,
+                                   indA = ind_a,
+                                   indPhi = ind_phi))
+     if (!inherits(sim_dat, "try-error")) {
+        break
+    } else {
+        if (tries == max_tries) {
+            break
+        }
+    
+    }
+  }
+  
+  # save dgp
+  # uncommented for reprex
+  # saveRDS(sim_dat, file = paste0(here("output/simulation/sim_dat_"), n_ind, "_", tp,
+                                   # ".RDS"))
+  
+  # list of data matrices
+  l_dat <- lapply(sim_dat$dataList, function(x){
+    as.matrix(x, ncol = nvar)
+  })
+  
+  # list of edge weights
+  l_paths <- lapply(sim_dat$indList, function(x){
+    x$Paths
+  })
+  
+  # overall counts matrix
+  l_counts <- lapply(sim_dat$indList, function(x){
+    x$Adj
+  })
+  path_counts <- Reduce('+', l_counts)
+  
+  
+  dat <- list(dat = l_dat, 
+              ind_paths = l_paths, 
+              path_counts = path_counts, 
+              group_ind = group_ind)
+  
+  return(dat)
+}
+```
+
+
+# Analyze
+
+```{r}
+sim_analyse_gimme <- function(condition, dat, fixed_objects = NULL){
+  
+  # obtain fixed objects
+  Attach(fixed_objects)
+  
+  # save dgp parameters for later
+  dgp_ind_paths <- dat$ind_paths
+  dgp_path_counts <- dat$path_counts
+  dgp_sub_ind <- dat$group_ind
+  
+  # Initialize an empty list to store results
+  results <- list()
+  
+  # Perform the first analysis and store the result in the list
+  gimme_default <- try(gimme(data = dat$dat,
+                     ar = TRUE, 
+                     subgroup = TRUE,
+                     groupcutoff = 0.75,
+                     subcutoff = 0.75))
+  
+  
+  # Check if the gimme function call was successful
+  # if (inherits(gimme_default, "try-error")) {
+  #   # If there was an error, create a list with "NA" values for each element
+  #   results$default <- list(
+  #     path_counts = NA,
+  #     path_est_mats = NA,
+  #     sub_ind = NA,
+  #     dgp_path_counts = NA,
+  #     dgp_ind_paths = NA,
+  #     dgp_sub_ind = NA
+  #   )
+  # } else {
+    results$default <- list(
+      path_counts = gimme_default$path_counts,
+      path_est_mats = gimme_default$path_est_mats,
+      sub_ind = gimme_default$fit$sub_membership,
+      dgp_path_counts = dgp_path_counts,
+      dgp_ind_paths = dgp_ind_paths,
+      dgp_sub_ind = dgp_sub_ind
+    )
+  # }
+  
+  # Perform the second analysis and store the result in the list
+  gimme_liberal <- try(gimme(data = dat$dat,
+                     ar = TRUE, 
+                     subgroup = TRUE,
+                     groupcutoff = 0.50,
+                     subcutoff = 0.50))
+  
+  # if (inherits(gimme_liberal, "try-error")) {
+  #   # If there was an error, create a list with "NA" values for each element
+  #   results$liberal <- list(
+  #     path_counts = NA,
+  #     path_est_mats = NA,
+  #     sub_ind = NA,
+  #     dgp_path_counts = NA,
+  #     dgp_ind_paths = NA,
+  #     dgp_sub_ind = NA
+  #   )
+  # } else {
+    results$liberal <- list(
+      path_counts = gimme_liberal$path_counts,
+      path_est_mats = gimme_liberal$path_est_mats,
+      sub_ind = gimme_liberal$fit$sub_membership,
+      dgp_path_counts = dgp_path_counts,
+      dgp_ind_paths = dgp_ind_paths,
+      dgp_sub_ind = dgp_sub_ind
+    )
+  # }
+  
+  # Return the list of results
+  return(results)
+  
+}
+```
+
+
+
+
+```{r}
+sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
+  
+  # obtain fixed objects
+  Attach(fixed_objects)
+  
+  # save dgp parameters for later
+  dgp_ind_paths <- dat$ind_paths
+  dgp_path_counts <- dat$path_counts
+  dgp_sub_ind <- dat$group_ind
+  
+  # Initialize an empty list to store results
+  results <- list()
+  
+  # Perform the first analysis and store the result in the list
+  gimme_default <- try(multiverse.gimme(data = dat$dat,
+                     ar = TRUE, 
+                     subgroup = TRUE,
+                     groupcutoffs = 0.75,
+                     subcutoffs = 0.75))
+  
+  results$default <- list(
+    path_counts = gimme_default[[1]]$path_counts,
+    path_est_mats = gimme_default[[1]]$path_est_mats,
+    sub_ind = gimme_default[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
+    dgp_sub_ind = dgp_sub_ind
+  )
+  
+  # Perform the second analysis and store the result in the list
+  gimme_liberal <- try(multiverse.gimme(data = dat$dat,
+                     ar = TRUE, 
+                     subgroup = TRUE,
+                     groupcutoffs = 0.75,
+                     subcutoffs = 0.75,
+                     rmsea.cuts = 0.08,
+                     srmr.cuts = 0.08,
+                     nnfi.cuts = 0.90,
+                     cfi.cuts = 0.90))
+  
+  results$liberal <- list(
+    path_counts = gimme_liberal[[1]]$path_counts,
+    path_est_mats = gimme_liberal[[1]]$path_est_mats,
+    sub_ind = gimme_liberal[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
+    dgp_sub_ind = dgp_sub_ind
+  )
+  
+  # Perform the third analysis and store the result in the list
+  gimme_strict <- try(multiverse.gimme(data = dat$dat,
+                     ar = TRUE, 
+                     subgroup = TRUE,
+                     groupcutoffs = 0.75,
+                     subcutoffs = 0.75,
+                     rmsea.cuts = 0.03,
+                     srmr.cuts = 0.03,
+                     nnfi.cuts = 0.97,
+                     cfi.cuts = 0.97))
+  
+  results$strict <- list(
+    path_counts = gimme_strict[[1]]$path_counts,
+    path_est_mats = gimme_strict[[1]]$path_est_mats,
+    sub_ind = gimme_strict[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
+    dgp_sub_ind = dgp_sub_ind
+  )
+  
+  # Perform the fourth analysis and store the result in the list
+  gimme_threshold1 <- try(multiverse.gimme(data = dat$dat,
+                        ar = TRUE, 
+                        subgroup = TRUE,
+                        groupcutoffs = 0.75,
+                        subcutoffs = 0.75,
+                        n.excellent = 1))
+  
+  results$threshold1 <- list(
+    path_counts = gimme_threshold1[[1]]$path_counts,
+    path_est_mats = gimme_threshold1[[1]]$path_est_mats,
+    sub_ind = gimme_threshold1[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
+    dgp_sub_ind = dgp_sub_ind
+  )
+  
+  # Return the list of results
+  return(results)
+}
+```
+
+
+# Summarize
+
+```{r}
+sim_summarize <- function(condition, results, fixed_objects = NULL){
+
+  
+  ret <- list()
+  #---- Loop over different analysis fns -----
+  for(m in 1:length(results[[1]])){
+    
+  
+  
+  #----- Subgroup ------
+  ari_sub <- lapply(seq_along(results), function(i){
+    
+    if(is.null(results[[i]][[m]]$sub_ind)){
+      NULL
+    } 
+    else{
+      perturbR:::arandi(results[[i]][[m]]$dgp_sub_ind, results[[i]][[m]]$sub_ind)
+    }
+    
+  })
+  
+  
+  
+  #----- Individual -----
+  
+  # Compare overall path counts
+  diff_path_counts <- lapply(seq_along(results), function(i){
+    sum(results[[i]][[m]]$dgp_path_counts - results[[i]][[m]]$path_counts)
+  })
+  
+  # Compute bias
+  bias_paths <- lapply(seq_along(results), function(i){
+     l_diff <- Map('-', results[[i]][[m]]$dgp_ind_paths, results[[i]][[m]]$path_est_mats)
+     lapply(l_diff, function(y){as.matrix(y)})
+  })
+  
+  # Precision
+  precision_directed <- lapply(seq_along(results), function(i){
+    try(precision(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
+  })
+  
+  # Recall
+  recall_directed <- lapply(seq_along(results), function(i){
+    try(recall(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
+  })
+  
+  
+  #----- Aggregate -----
+  diff_path_counts_mean <- mean(unlist(diff_path_counts), na.rm = TRUE)
+  diff_path_counts_sd <- sd(unlist(diff_path_counts), na.rm = TRUE)
+  
+  # Aggregate ARI
+  ari_mean <- mean(unlist(ari_sub), na.rm = TRUE)
+  ari_sd <- sd(unlist(ari_sub), na.rm = TRUE)
+  
+  
+  # Recall and Precision
+  precision_directed_mean <- mean(unlist(precision_directed), na.rm = TRUE)
+  precision_directed_mcse <- sqrt((precision_directed_mean*(1-precision_directed_mean)) / replications)
+  recall_directed_mean <- mean(unlist(precision_directed), na.rm = TRUE)
+  recall_directed_mcse <- sqrt((recall_directed_mean*(1-recall_directed_mean)) / replications)
+  
+  
+  # Aggregate bias
+  mean_bias_ests <- lapply(bias_paths, function(x){
+    l_tmp <- list()
+    mean_mat <- apply(simplify2array(x), 1:2, mean, na.rm = TRUE)
+    l_tmp$mean_nonzero_diff <- mean(abs(mean_mat[mean_mat != 0]), na.rm = TRUE)
+    l_tmp$var_nonzero_diff <- var(abs(mean_mat[mean_mat != 0]), na.rm = TRUE)
+    l_tmp$mean_diff <- mean(abs(mean_mat), na.rm = TRUE)
+    l_tmp$var_diff <- var(abs(mean_mat), na.rm = TRUE)
+    return(l_tmp)
+  })
+  
+  # for MCSE formulas, see Morris et al. 2019 SIM
+  bias_nonzero_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_nonzero_diff))
+  bias_nonzero_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_nonzero_diff)) / (replications * (replications - 1)))
+  bias_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_diff))
+  bias_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_diff)) / (replications * (replications - 1)))
+  
+  
+  # Output
+  ret_mod <- c(ari_m = ari_mean,
+           # ari_sd = ari_sd,
+           prec_dir_m = precision_directed_mean,
+           recall_dir_m = recall_directed_mean,
+           diff_paths_m = diff_path_counts_mean,
+           # bias_nonz_m = bias_nonzero_mean,
+           # bias_nonz_mcse = bias_nonzero_mcse,
+           bias_m = bias_mean,
+           bias_mcse = bias_mcse
+           )
+  ret_mod <- round(ret_mod, digits = 5)
+  ret_mod <- unlist(ret_mod)
+  ret[[m]] <- ret_mod
+  
+  names(ret)[m] <- names(results[[1]])[m]
+
+  
+  }
+
+  return(ret)
+}
+```
+
+
+
+
+
+# Run Simulation
+
+```{r}
+# For testing use first condition only
+sim_design_test <- sim_design[1,]
+replications = 3
+
+sim_res <- SimDesign::runSimulation(sim_design_test, 
+                                    replications = replications, 
+                                    # save_results = TRUE,
+                                    # store_results = TRUE, 
+                                    generate = sim_generate, 
+                                    analyse = sim_analyse_all,
+                                    summarise = sim_summarize,
+                                    # save = TRUE, 
+                                    # save_seeds = TRUE,
+                                    packages = c("here"), 
+                                    fixed_objects = sim_pars,
+                                    parallel = TRUE,
+                                    debug = "summarise")
+SimClean()
+
+```
+
+
+
+
