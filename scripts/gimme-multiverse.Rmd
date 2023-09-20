@@ -267,7 +267,7 @@ Which group-level paths were found most often?
 ```{r}
 Reduce('+', comp_pers$adjacency_g)
 
-# Heterogeneity of reference fit
+# Heterogeneity
 summary(unlist(comp_pers$heterogeneity_g))
 
 # Heterogeneity of original fit (number of converged individuals)
@@ -319,9 +319,16 @@ add_matrices <- function(matrix_list) {
 
 # Use lapply to apply the custom function to each matrix name across all elements
 # Added contemporaneous indicator manually
-result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
-  add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]][,7:12]))
-})
+# result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
+#   add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]][,7:12]))
+# })
+
+# both contemporaneous and temporal
+ result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
+   add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]]))
+ })
+
+
 
 # calculate average difference
 avg_diff_adj <- sapply(result, function(x) sum(abs(x)))/3887
@@ -640,7 +647,7 @@ rmsea_levels <- c("strict", "medium", "liberal")
 srmr_levels <- c("strict", "medium", "liberal")
 nnfi_levels <- c("liberal", "medium", "strict")
 cfi_levels <- c("liberal", "medium", "strict")
-n_excels_levels <- c("strict", "medium", "liberal")
+n_excels_levels <- c("liberal", "medium", "strict")
 
 
 ```
@@ -648,14 +655,15 @@ n_excels_levels <- c("strict", "medium", "liberal")
 ## Personality Dataset
 
 
-### Manuscript
-
+### SCA Adjacency
 Specification curve plot adjacency matrix
 ```{r}
 plot_out_adj_pers <- plot_outcome(mv_res = comp_pers, var = diff_adj_sum_mean_i,
                                   y_label = "Mean of Adjacency Matrix Differences") +
   theme(axis.title = element_text(size = rel(1.5)),
-        axis.text = element_text(size = rel(1.5)))
+        axis.text = element_text(size = rel(1.5)))+
+  # add reference line
+  geom_hline(yintercept = 0, color = "black", lty = 2)
 plot_spec_adj_pers <- plot_specification(mv_res = comp_pers, var = diff_adj_sum_mean_i)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
@@ -674,24 +682,89 @@ rm(spec_plot_adj_pers)
 
 
 
-
+### Network Multiverse
 Network multiverse plot
 ```{r}
 # TODO add better legend/node labels here
 pdf(here("figures/mv_net_pers.pdf"), width = 8, height = 4)
-multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.2, n_ind = 94)
+multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.2, n_ind = 94,
+                   fade = TRUE)
 dev.off()
+
+```
+Visualize reference fit with percentages
+
+```{r}
+ref_pct_mat <- ref_fit_pers_og$path_counts/94
+ref_pct_mat[abs(ref_pct_mat) < 0.05] <- 0
+ref_temp_mat <- ref_pct_mat[,1:6]
+ref_cont_mat <- ref_pct_mat[,7:12]
+
+# percentage labels
+pct_labels_temp <- paste0(round(t(ref_temp_mat)*100,1), " %")
+pct_labels_cont <- paste0(round(t(ref_cont_mat)*100,1), " %")
+
+# 
+pdf("figures/ref_multi_net_pers.pdf")
+par(mar=c(1,1,1,1))
+layout(matrix(c(1,2,3,5,1,4,3,6),ncol=2),heights=c(.5,3.5,.5,3.5))
+plot.new()
+text(0.5,0.3,"Reference Network",cex=1.2,font=1)
+# Temporal
+qgraph::qgraph(
+      input = t(ref_temp_mat), 
+      layout  = "circle",
+      lty = 1,
+      edge.labels  = pct_labels_temp,
+      theme = "colorblind",
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      # arrows       = FALSE,
+      labels = colnames(ref_cont_mat),    # so that this does not show "lag" in name
+      # title.cex = 2, 
+      label.cex    = 1.21,
+      title = "Temporal",
+      maximum = 1)
+plot.new()
+text(0.5,0.3,"Multiverse Network",cex=1.2,font=1)
+# Contemporaneous
+qgraph::qgraph(
+      input = t(ref_cont_mat), 
+      layout  = "circle",
+      lty = 1,
+      edge.labels  = pct_labels_cont,
+      theme = "colorblind",
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      # arrows   = FALSE,
+      labels = colnames(ref_cont_mat),
+      # title.cex = 2,
+      label.cex = 1.21,
+      title = "Contemporaneous",
+      maximum = 1)
+
+multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.21, n_ind = 94,
+                   fade = TRUE)
+
+dev.off()
+
+
 
 ```
 
 
+
+
+### SCA Density
 Specification curve plot density
 ```{r}
 plot_out_dens_pers <- plot_outcome(mv_res = comp_pers, 
                               var = mean_diff_dens_cont_i,
                               y_label = "Density Difference") +
   theme(axis.title = element_text(size = rel(1.5)),
-        axis.text = element_text(size = rel(1.5)))
+        axis.text = element_text(size = rel(1.5)))+
+    # add reference line
+  geom_hline(yintercept = 0, color = "black", lty = 2)
 plot_spec_dens_pers <- plot_specification(mv_res = comp_pers, var = mean_diff_dens_cont_i)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
@@ -717,13 +790,18 @@ ref_dens_cont <- lapply(ref_fit_pers_og$path_est_mats, function(x){
   })
 mean_ref_dens_cont<- mean(unlist(ref_dens_cont), na.rm = TRUE)
 
-comp_pers$pct_diff_dens_cont <- (comp_pers$mean_diff_dens_cont_i / mean_ref_dens_cont)*100
+# We take the negative of the density difference to 
+# clearly show when a multiverse network is denser in the plot 
+
+comp_pers$pct_diff_dens_cont <- (-comp_pers$mean_diff_dens_cont_i / mean_ref_dens_cont)*100
 
 plot_out_dens_pers_pct <- plot_outcome(mv_res = comp_pers, 
                               var = pct_diff_dens_cont,
                               y_label = "% Density Difference") +
   theme(axis.title = element_text(size = rel(1.5)),
-        axis.text = element_text(size = rel(1.5)))
+        axis.text = element_text(size = rel(1.5)))+
+      # add reference line
+  geom_hline(yintercept = 0, color = "black", lty = 2)
 plot_spec_dens_pers_pct <- plot_specification(mv_res = comp_pers, var = pct_diff_dens_cont)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
@@ -742,11 +820,11 @@ rm(spec_plot_dens_pers)
 ```
 
 
-### Supplement
 
 
 ## Emotion Dataset
 
+### SCA Adjacency
 Specification curve plot adjacency matrix
 ```{r}
 # for correct colors
@@ -755,7 +833,9 @@ sub_cuts <- c(.51, .60, .75, .80)
 plot_out_adj_emot <- plot_outcome(mv_res = comp_emot, var = diff_adj_sum_mean_i,
                                   y_label = "Mean of Adjacency Matrix Differences") +
   theme(axis.title = element_text(size = rel(1.5)),
-        axis.text = element_text(size = rel(1.5)))
+        axis.text = element_text(size = rel(1.5)))+
+          # add reference line
+  geom_hline(yintercept = 0, color = "black", lty = 2)
 plot_spec_adj_emot <- plot_specification(mv_res = comp_emot, var = diff_adj_sum_mean_i)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
@@ -773,6 +853,7 @@ rm(spec_plot_adj_emot)
 ```
 
 
+### Network Multiverse
 Network multiverse plot
 ```{r}
 # add better legend/node labels here
@@ -785,12 +866,94 @@ pdf(here("figures/mv_net_emot.pdf"), width = 8, height = 4)
 multiverse.network(comp_emot, cutoff = .05, 
                    title.cex = 1, label.cex = 1.2, 
                    n_ind = 105, endogeneous = TRUE, 
-                   temp_labels = temp_labels, cont_labels = cont_labels)
+                   temp_labels = temp_labels, cont_labels = cont_labels,
+                   fade = TRUE)
 dev.off()
 
 ```
 
 
+Visualize reference fit with percentages
+
+```{r}
+ref_pct_mat <- ref_fit_emot_og$path_counts/104
+ref_pct_mat[abs(ref_pct_mat) < 0.05] <- 0
+ref_temp_mat <- ref_pct_mat[,1:9]
+ref_cont_mat <- ref_pct_mat[,10:19]
+
+# delete empty timeofday row
+ref_temp_mat <- ref_temp_mat[-10,]
+
+# percentage labels
+pct_labels_temp <- paste0(round(t(ref_temp_mat)*100,1), " %")
+pct_labels_cont <- paste0(round(t(ref_cont_mat)*100,1), " %")
+
+# labels
+temp_labels <- c("HighCorr\nPositive", "HighCorr\nNegative", "Enthusiastic",
+                 "Relaxed", "Sad", "Nervous", "Stressed", "MWoccur",
+                 "Emotion\nChronometry")
+cont_labels <- c(temp_labels, "TimeofDay")
+
+pdf("figures/ref_multi_net_emot.pdf")
+par(mar=c(1,1,1,1))
+layout(matrix(c(1,2,3,5,1,4,3,6),ncol=2),heights=c(.5,3.5,.5,3.5))
+plot.new()
+text(0.5,0.3,"Reference Network",cex=1.2,font=1)
+# Temporal
+
+qgraph::qgraph(
+      input = t(ref_temp_mat), 
+      layout  = "circle",
+      lty = 1,
+      edge.labels  = pct_labels_temp,
+      theme = "colorblind",
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      # arrows       = FALSE,
+      labels = temp_labels,    # so that this does not show "lag" in name
+      # title.cex = 2, 
+      label.cex    = 1.21,
+      title = "Temporal",
+      maximum = 1)
+plot.new()
+text(0.5,0.3,"Multiverse Network",cex=1.2,font=1)
+
+
+# Contemporaneous
+# create matrix with zero row for endogenous variable
+# ref_cont_mat <- rbind(ref_cont_mat, rep(0, 10))
+
+qgraph::qgraph(
+      input = t(ref_cont_mat), 
+      layout  = "circle",
+      lty = 1,
+      edge.labels  = pct_labels_cont,
+      theme = "colorblind",
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      # arrows   = FALSE,
+      labels = cont_labels,
+      # title.cex = 2,
+      label.cex = 1.21,
+      title = "Contemporaneous",
+      maximum = 1)
+
+
+
+multiverse.network(comp_emot, cutoff = .05, 
+                   title.cex = 1, label.cex = 1.2, 
+                   n_ind = 105, endogeneous = TRUE, 
+                   temp_labels = temp_labels, cont_labels = cont_labels,
+                   fade = TRUE)
+
+dev.off()
+
+
+
+```
+
+
+### SCA Density
 Specification curve plot density
 ```{r}
 # for correct colors
@@ -823,7 +986,6 @@ Use percentage deviation from original fit
 # for correct colors
 sub_cuts <- c(.51, .60, .75, .80)
 
-# TODO DO I COUNT TIMEOFDAY OR NOT?
 ref_dens_cont <- lapply(ref_fit_emot_og$path_est_mats, function(x){
     if(!is.double(x)){
       NA
@@ -834,13 +996,17 @@ ref_dens_cont <- lapply(ref_fit_emot_og$path_est_mats, function(x){
   })
 mean_ref_dens_cont<- mean(unlist(ref_dens_cont), na.rm = TRUE)
 
-comp_emot$pct_diff_dens_cont <- (comp_emot$mean_diff_dens_cont_i / mean_ref_dens_cont)*100
+# We take the negative of the density difference to 
+# clearly show when a multiverse network is denser in the plot 
+comp_emot$pct_diff_dens_cont <- (-comp_emot$mean_diff_dens_cont_i / mean_ref_dens_cont)*100
 
 plot_out_dens_emot_pct <- plot_outcome(mv_res = comp_emot, 
                               var = pct_diff_dens_cont,
                               y_label = "% Density Difference") +
   theme(axis.title = element_text(size = rel(1.5)),
-        axis.text = element_text(size = rel(1.5)))
+        axis.text = element_text(size = rel(1.5)))+
+        # add reference line
+  geom_hline(yintercept = 0, color = "black", lty = 2)
 plot_spec_dens_emot_pct <- plot_specification(mv_res = comp_emot, var = pct_diff_dens_cont)+
   theme(axis.title = element_text(size = rel(1.5)),
         axis.text = element_text(size = rel(1.5)))
@@ -854,13 +1020,10 @@ ggsave("spec_plot_dens_emot_pct.pdf", spec_plot_dens_emot, path = here("figures/
 
 rm(plot_out_dens_emot_pct)
 rm(plot_spec_dens_emot_pct)
-rm(spec_plot_dens_emot_pct)
+rm(spec_plot_dens_emot)
+
+
 
 ```
 
 
-
-### Manuscript
-
-
-### Supplement
