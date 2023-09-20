@@ -123,8 +123,6 @@ sgimmefit <- gimme(data = "data/kullar_2023/finaloutput", #folder with individua
 saveRDS(sgimmefit, file = "data/kullar_2023/kullar_2023_fit.RDS")
 sgimmefit <- readRDS("data/kullar_2023/kullar_2023_fit.RDS")
 
-
-
 ```
 
 # Summarize GIMME
@@ -158,3 +156,53 @@ table(unlist(max_temp))
 table(unlist(max_cont))
 
 ```
+
+
+# Replicate additional analyses
+Repeat the analyses for data-driven subgroups after changing the subgroup cutoff slightly. 
+```{r}
+# used slightly different cutoff here (subgroup = .50 instead of .51)
+mv_res_emot_new <- readRDS(here("output/mv_emotion/mv_res_emot_new.RDS"))
+
+# Find correct fit
+group_cuts <- c(.50, .60, .75, .80)
+sub_cuts <- c(.50, .60, .75, .80)
+rmsea_cuts <- c(.03, .05, .08)
+srmr_cuts <- c(.03, .05, .08)
+nnfi_cuts <- c(.90, .95, .97)
+cfi_cuts <- c(.90, .95, .97)
+n_excels <- c(1, 2, 3)
+
+multiverse_grid <- expand.grid(
+  group_cuts = group_cuts,
+  sub_cuts = sub_cuts,
+  rmsea_cuts = rmsea_cuts,
+  srmr_cuts = srmr_cuts,
+  nnfi_cuts = nnfi_cuts,
+  cfi_cuts = cfi_cuts,
+  n_excels = n_excels
+)
+ref_fit_ind <- multiverse_grid %>% 
+  mutate(spec = dplyr::row_number()) %>% 
+  filter(group_cuts == .75 &
+                        sub_cuts == .50 &
+                        rmsea_cuts == .05 &
+                        srmr_cuts == .05 &
+                        nnfi_cuts == .95 &
+                        cfi_cuts == .95 &
+                        n_excels == 2) %>% 
+  pull(spec)
+
+alt_fit_emot <- mv_res_emot_new[[ref_fit_ind]]
+```
+
+Code for these analyses is not provided directly, but we may try to replicate some of it. 
+```{r}
+sub_membership <- alt_fit_emot$fit$sub_membership
+esmdata <- read.csv(here("data/kullar_2023/esmdata.csv"))
+
+```
+
+
+
+
