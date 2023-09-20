@@ -32,15 +32,15 @@ Maybe also different sparsity levels?
 ```{r sim-settings}
 # sample_sizes <- c(50, 100, 200)
 # For testing only:
-sample_sizes <- c(30, 80)
-# sample_sizes <- c(30)
+# sample_sizes <- c(30, 80)
+n_ind <- c(35)
 ar <- c(.2)
 ind_a <- c(.15, .40)
 # ind_a <- c(.15)
 ind_phi <- c(.05, .25)
 replications <- 500
 
-sim_design <- SimDesign::createDesign(sample_size = sample_sizes,
+sim_design <- SimDesign::createDesign(n_ind = n_ind,
                                       ar = ar,
                                       ind_a = ind_a,
                                       ind_phi = ind_phi)
@@ -90,7 +90,7 @@ psi_list <- list(psi_mat, psi_mat)
 
 
 sim_pars <- list(
-  t = 100,
+  tp = 100,
   phi_list = phi_list,
   a_1 = a_1,
   psi_list = psi_list,
@@ -107,12 +107,17 @@ Then, create data-generation function to sample from this model, using `gimme`.
 ```{r data-generation}
 sim_generate <- function(condition, 
                          fixed_objects = NULL){
+  
   # obtain fixed parameters
   SimDesign::Attach(fixed_objects)
   
   # obtain condition parameters
-  n <- condition$sample_size
-  group_ind <- c(rep(1, (n/2)), rep(2, (n/2)))
+  n_ind <- condition$n_ind
+  # number of individuals in each group (while accounting for odd numbers)
+  group_size <- floor(n_ind / 2)
+
+  # Create group indicators
+  group_ind <- c(rep(1, group_size), rep(2, n_ind - group_size))
   ar <- condition$ar
   ind_a <- condition$ind_a
   ind_phi <- condition$ind_phi
@@ -124,13 +129,14 @@ sim_generate <- function(condition,
   tries <- 0
   max_tries <- 100
   while (tries < max_tries) {
+    tries <- tries + 1
     sim_dat <- try(simulateVARtest(
                                    A = a_list, 
                                    Phi = phi_list,
                                    Psi = psi_list,
                                    subAssign = group_ind,
-                                   N = n,
-                                   Obs = t,
+                                   N = n_ind,
+                                   tp = tp,
                                    indA = ind_a,
                                    indPhi = ind_phi))
      if (!inherits(sim_dat, "try-error")) {
@@ -144,7 +150,7 @@ sim_generate <- function(condition,
   }
   
   # save dgp
-  saveRDS(sim_dat, file = paste0(here("output/simulation/sim_dat_"), n, "_", t,
+  saveRDS(sim_dat, file = paste0(here("output/simulation/sim_dat_"), n_ind, "_", tp,
                                    ".RDS"))
   
   # list of data matrices
@@ -244,8 +250,8 @@ sim_analyse_gimme_default <- function(condition, dat, fixed_objects = NULL){
   gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
                  subgroup = TRUE,
-                 groupcutoff = .75,
-                 subcutoff   = .75))
+                 groupcutoffs = .75,
+                 subcutoffs   = .75))
  
   
   ret <- list(path_counts = gimme_res[[1]]$path_counts,
@@ -270,8 +276,8 @@ sim_analyse_gimme_liberal <- function(condition, dat, fixed_objects = NULL){
   gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
                  subgroup = TRUE,
-                 groupcutoff = .75,
-                 subcutoff   = .75,
+                 groupcutoffs = .75,
+                 subcutoffs   = .75,
                  rmsea.cuts = .08,
                  srmr.cuts = .08,
                  nnfi.cuts = .90,
@@ -300,8 +306,8 @@ sim_analyse_gimme_strict <- function(condition, dat, fixed_objects = NULL){
   gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
                  subgroup = TRUE,
-                 groupcutoff = .75,
-                 subcutoff   = .75,
+                 groupcutoffs = .75,
+                 subcutoffs   = .75,
                  rmsea.cuts = .03,
                  srmr.cuts = .03,
                  nnfi.cuts = .97,
@@ -330,8 +336,8 @@ sim_analyse_gimme_threshold1 <- function(condition, dat, fixed_objects = NULL){
   gimme_res <- try(multiverse.gimme(data = dat$dat,
                  ar = TRUE, 
                  subgroup = TRUE,
-                 groupcutoff = .75,
-                 subcutoff   = .75,
+                 groupcutoffs = .75,
+                 subcutoffs   = .75,
                  n.excellent = 1))
   
   ret <- list(path_counts = gimme_res[[1]]$path_counts,
@@ -348,6 +354,8 @@ sim_analyse_gimme_threshold1 <- function(condition, dat, fixed_objects = NULL){
 
 
 ```
+
+
 
 
 
@@ -410,18 +418,19 @@ nondirect_adjacency <- function(adj_mat) {
 
 
 abs_mean <- function(x){
-  mean(abs(x))
+  mean(abs(x), na.rm = TRUE)
 }
 abs_med <- function(x){
-  stats::median(abs(x))
+  stats::median(abs(x), na.rm = TRUE)
 }
 
 abs_sum <- function(x){
-  sum(abs(x))
+  sum(abs(x), na.rm = TRUE)
 }
 ```
 
 
+For testing: do not return list of results?
 
 
 This is relevant here: http://philchalmers.github.io/SimDesign/html/04-Auxillary_parameter_recovery.html
@@ -465,39 +474,39 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   # Precision
   precision_directed <- lapply(seq_along(results), function(i){
-    precision(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts)
+    try(precision(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
   })
   
   # Recall
   recall_directed <- lapply(seq_along(results), function(i){
-    recall(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts)
+    try(recall(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
   })
   
   
   #----- Aggregate -----
-  diff_path_counts_mean <- mean(unlist(diff_path_counts))
-  diff_path_counts_sd <- sd(unlist(diff_path_counts))
+  diff_path_counts_mean <- mean(unlist(diff_path_counts), na.rm = TRUE)
+  diff_path_counts_sd <- sd(unlist(diff_path_counts), na.rm = TRUE)
   
   # Aggregate ARI
-  ari_mean <- mean(unlist(ari_sub))
-  ari_sd <- sd(unlist(ari_sub))
+  ari_mean <- mean(unlist(ari_sub), na.rm = TRUE)
+  ari_sd <- sd(unlist(ari_sub), na.rm = TRUE)
   
   
   # Recall and Precision
-  precision_directed_mean <- mean(unlist(precision_directed))
+  precision_directed_mean <- mean(unlist(precision_directed), na.rm = TRUE)
   precision_directed_mcse <- sqrt((precision_directed_mean*(1-precision_directed_mean)) / replications)
-  recall_directed_mean <- mean(unlist(precision_directed))
+  recall_directed_mean <- mean(unlist(precision_directed), na.rm = TRUE)
   recall_directed_mcse <- sqrt((recall_directed_mean*(1-recall_directed_mean)) / replications)
   
   
   # Aggregate bias
   mean_bias_ests <- lapply(bias_paths, function(x){
     l_tmp <- list()
-    mean_mat <- apply(simplify2array(x), 1:2, mean)
-    l_tmp$mean_nonzero_diff <- mean(abs(mean_mat[mean_mat != 0]))
-    l_tmp$var_nonzero_diff <- var(abs(mean_mat[mean_mat != 0]))
-    l_tmp$mean_diff <- mean(abs(mean_mat))
-    l_tmp$var_diff <- var(abs(mean_mat))
+    mean_mat <- apply(simplify2array(x), 1:2, mean, na.rm = TRUE)
+    l_tmp$mean_nonzero_diff <- mean(abs(mean_mat[mean_mat != 0]), na.rm = TRUE)
+    l_tmp$var_nonzero_diff <- var(abs(mean_mat[mean_mat != 0]), na.rm = TRUE)
+    l_tmp$mean_diff <- mean(abs(mean_mat), na.rm = TRUE)
+    l_tmp$var_diff <- var(abs(mean_mat), na.rm = TRUE)
     return(l_tmp)
   })
   
@@ -509,19 +518,21 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   
   # Output
-  ret_mod <- c(ari_mean = ari_mean,
-           ari_sd = ari_sd,
-           precision_directed_mean = precision_directed_mean,
-           recall_directed_mean = recall_directed_mean,
-           diff_path_counts_mean = diff_path_counts_mean,
-           bias_nonzero_mean = bias_nonzero_mean,
-           bias_nonzero_mcse = bias_nonzero_mcse,
-           bias_mean = bias_mean,
-           bias_mcse = bias_mcse
+  ret_mod <- c(ari_m = ari_mean,
+           # ari_sd = ari_sd,
+           # prec_dir_m = precision_directed_mean,
+           # recall_dir_m = recall_directed_mean,
+           # diff_paths_m = diff_path_counts_mean,
+           bias_nonz_m = bias_nonzero_mean
+           # bias_nonz_mcse = bias_nonzero_mcse,
+           # bias_m = bias_mean,
+           # bias_mcse = bias_mcse
            )
   ret_mod <- unlist(ret_mod)
   ret[[m]] <- ret_mod
   
+  
+  # TODO maybe switch this on again
   names(ret)[m] <- names(results[[1]])[m]
   # Add model name
   # names(ret[[m]]) <- paste0(names(ret[[m]]), names(results[[1]])[m])
@@ -529,7 +540,10 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   }
   
 
-  ret <- unlist(ret)
+  # ret <- unlist(ret)
+  # try to cut names to certain length
+  
+  
   # ret <- unname(ret)
   return(ret)
 }
@@ -542,18 +556,25 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
 
 ```{r}
 
-sim_res <- SimDesign::runSimulation(sim_design, 
+# for testing second row which throws errors
+sim_design_test <- sim_design[c(1),]
+replications = 2
+# rows 1,3,5 work
+# 2, 4 does not
+
+sim_res <- SimDesign::runSimulation(sim_design_test, 
                                     replications = replications, 
-                                    save_results = TRUE,
+                                    # save_results = TRUE,
+                                    store_results = TRUE, 
                                     generate = sim_generate, 
                                     analyse = list(
-                                    gimme = sim_analyse_gimme_default, 
-                                    liberal = sim_analyse_gimme_liberal, 
-                                    strict = sim_analyse_gimme_strict,
-                                    thresh = sim_analyse_gimme_threshold1
+                                    gimme = sim_analyse_gimme_default,
+                                    liberal = sim_analyse_gimme_liberal
+                                    # strict = sim_analyse_gimme_strict,
+                                    # threshold = sim_analyse_gimme_threshold1
                                     ),
                                     # analyse = sim_analyse_gimme_liberal,
-                                    summarise = sim_summarize, 
+                                    summarise = sim_summarize,
                                     # save = TRUE, 
                                     # save_seeds = TRUE,
                                     packages = c("mvgimme", "here"), 
@@ -568,5 +589,68 @@ SimClean()
 # Keeping Track of common bugs:
 Error in do.call(data.frame, c(x, alis)) : 
   variable names are limited to 10000 bytes - ?????
+  
+This is the detailed error message: 
+traceback()
+5: do.call(data.frame, c(x, alis))
+4: as.data.frame.list(x[[i]], optional = TRUE, stringsAsFactors = stringsAsFactors)
+3: as.data.frame(x[[i]], optional = TRUE, stringsAsFactors = stringsAsFactors)
+2: data.frame(design[i, ], as.list(tmp), check.names = FALSE)
+1: SimDesign::runSimulation(sim_design_test, replications = replications, 
+       generate = sim_generate, analyse = list(gimme = sim_analyse_gimme_default, 
+           liberal = sim_analyse_gimme_liberal, strict = sim_analyse_gimme_strict, 
+           threshold = sim_analyse_gimme_threshold1), summarise = sim_summarize, 
+       packages = c("mvgimme", "here"), fixed_objects = sim_pars, 
+       parallel = TRUE)  
+  
+```{r}
+data.frame(sim_design_test[1,], as.list(sim_res[1,]), check.names = FALSE)
+
+```
+
+
+
+
+Debugging:
+```{r}
+
+# obtain condition parameters
+n <- sim_design[2,]$sample_size
+group_ind <- c(rep(1, (n/2)), rep(2, (n/2)))
+ar <- sim_design[2,]$ar
+ind_a <- sim_design[2,]$ind_a
+ind_phi <- sim_design[2,]$ind_phi
+  
+# Create matrix list depending on AR effect
+diag(a_1) <- rep(ar, 6)
+a_2 <- a_1 + change_a
+a_list <- list(a_1, a_2)
+tries <- 0
+max_tries <- 100
+while (tries < max_tries) {
+  tries <- tries + 1
+  print(paste("Start try ", tries))
+  sim_dat <- try(simulateVARtest(
+                                   A = a_list, 
+                                   Phi = phi_list,
+                                   Psi = psi_list,
+                                   subAssign = group_ind,
+                                   N = n,
+                                   Obs = 100,
+                                   indA = ind_a,
+                                   indPhi = ind_phi))
+ if (!inherits(sim_dat, "try-error")) {
+   
+      break
+  } else {
+      if (tries == max_tries) {
+           break
+      }
+  
+   }
+}
+
+
+```
 
 
