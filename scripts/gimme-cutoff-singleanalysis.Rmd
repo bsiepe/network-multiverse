@@ -5,6 +5,27 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 Goal of this document is to implement SimDesign with a single analysis fn to debug easily. 
+---
+title: "GIMME Cutoff Simulation"
+author: "Björn Siepe"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+This document contains code for a small simulation on using different fit index cutoffs
+as stopping criteria for GIMME. 
+
+# Preparation
+```{r packages}
+library(tidyverse)
+library(mvgimme)    # multiverse gimme
+library(SimDesign)  # simulation design
+library(here)
+library(ggokabeito)
+library(ggh4x)
+source(here::here("scripts/aux_funs.R"))
+
+```
 
 This document contains code for a small simulation on using different fit index cutoffs
 as stopping criteria for GIMME. 
@@ -33,8 +54,8 @@ Maybe also different sparsity levels?
 ```{r sim-settings}
 # sample_sizes <- c(50, 100, 200)
 # For testing only:
-# n_ind <- c(30, 80)
-n_ind <- c(31)
+n_ind <- c(30, 80)
+# n_ind <- c(31)
 ar <- c(.2)
 ind_a <- c(.15, .40)
 # ind_a <- c(.15)
@@ -128,8 +149,6 @@ sim_generate <- function(condition,
   nvar <- ncol(a_1)
   a_2 <- a_1 + change_a
   a_list <- list(a_1, a_2)
-  
-  # Simulate data
   tries <- 0
   max_tries <- 100
   while (tries < max_tries) {
@@ -212,11 +231,11 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
                      subcutoffs = 0.75))
   
   results$default <- list(
-    # path_counts = gimme_default[[1]]$path_counts,
-    # path_est_mats = gimme_default[[1]]$path_est_mats,
-    # sub_ind = gimme_default[[1]]$fit$sub_membership,
-    # dgp_path_counts = dgp_path_counts,
-    # dgp_ind_paths = dgp_ind_paths,
+    path_counts = gimme_default[[1]]$path_counts,
+    path_est_mats = gimme_default[[1]]$path_est_mats,
+    sub_ind = gimme_default[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
     dgp_sub_ind = dgp_sub_ind
   )
   
@@ -232,11 +251,11 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
                      cfi.cuts = 0.90))
   
   results$liberal <- list(
-    # path_counts = gimme_liberal[[1]]$path_counts,
-    # path_est_mats = gimme_liberal[[1]]$path_est_mats,
-    # sub_ind = gimme_liberal[[1]]$fit$sub_membership,
-    # dgp_path_counts = dgp_path_counts,
-    # dgp_ind_paths = dgp_ind_paths,
+    path_counts = gimme_liberal[[1]]$path_counts,
+    path_est_mats = gimme_liberal[[1]]$path_est_mats,
+    sub_ind = gimme_liberal[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
     dgp_sub_ind = dgp_sub_ind
   )
   
@@ -252,11 +271,11 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
                      cfi.cuts = 0.97))
   
   results$strict <- list(
-    # path_counts = gimme_strict[[1]]$path_counts,
-    # path_est_mats = gimme_strict[[1]]$path_est_mats,
-    # sub_ind = gimme_strict[[1]]$fit$sub_membership,
-    # dgp_path_counts = dgp_path_counts,
-    # dgp_ind_paths = dgp_ind_paths,
+    path_counts = gimme_strict[[1]]$path_counts,
+    path_est_mats = gimme_strict[[1]]$path_est_mats,
+    sub_ind = gimme_strict[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
     dgp_sub_ind = dgp_sub_ind
   )
   
@@ -269,11 +288,11 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
                         n.excellent = 1))
   
   results$threshold1 <- list(
-    # path_counts = gimme_threshold1[[1]]$path_counts,
-    # path_est_mats = gimme_threshold1[[1]]$path_est_mats,
-    # sub_ind = gimme_threshold1[[1]]$fit$sub_membership,
-    # dgp_path_counts = dgp_path_counts,
-    # dgp_ind_paths = dgp_ind_paths,
+    path_counts = gimme_threshold1[[1]]$path_counts,
+    path_est_mats = gimme_threshold1[[1]]$path_est_mats,
+    sub_ind = gimme_threshold1[[1]]$fit$sub_membership,
+    dgp_path_counts = dgp_path_counts,
+    dgp_ind_paths = dgp_ind_paths,
     dgp_sub_ind = dgp_sub_ind
   )
   
@@ -292,11 +311,15 @@ Helpers:
 ```{r}
 #--- Compute Precision
 precision <- function(true, est){
+
   # true paths relative to all paths
   true_pos <- sum(true & est)
   all_pos <- sum(est)
   
-  if (all_pos == 0) {
+  if(is.na(all_pos)){
+    return(NA)
+  }
+  else if (all_pos == 0) {
     return(0)
   } else {
     precision <- true_pos / all_pos
@@ -306,10 +329,14 @@ precision <- function(true, est){
 
 #--- Compute Recall
 recall <- function(true, est) {
+
   true_pos <- sum(true & est)
   all_true <- sum(true)
   
-  if (all_true == 0) {
+  if(is.na(all_true)){
+    return(NA)
+  }
+  else if (all_true == 0) {
     return(0)
   } else {
     recall <- true_pos / all_true
@@ -364,7 +391,7 @@ This is relevant here: http://philchalmers.github.io/SimDesign/html/04-Auxillary
 ```{r summary-function}
 sim_summarize <- function(condition, results, fixed_objects = NULL){
 
-  
+  # browser()
   ret <- list()
   #---- Loop over different analysis fns -----
   for(m in 1:length(results[[1]])){
@@ -386,6 +413,19 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   
   #----- Individual -----
+  # Compute adjacency matrix for each individual
+  # sorry I know this is ugly, I have no more coffee
+  for(i in seq_along(results)){
+    results[[i]][[m]]$dgp_ind_counts <- lapply(results[[i]][[m]]$dgp_ind_paths,
+                                               function(x){
+                                                 ifelse(x != 0, 1, 0)
+                                               })
+    results[[i]][[m]]$ind_counts <- lapply(results[[i]][[m]]$path_est_mats,
+                                               function(x){
+                                                 ifelse(x != 0, 1, 0)
+                                               })
+  }
+  
   
   # Compare overall path counts
   diff_path_counts <- lapply(seq_along(results), function(i){
@@ -399,13 +439,20 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   })
   
   # Precision
+  # precision_directed <- lapply(seq_along(results), function(i){
+  #   try(precision(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
+  # })
   precision_directed <- lapply(seq_along(results), function(i){
-    try(precision(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
+    Map("precision" ,results[[i]][[m]]$dgp_ind_counts, results[[i]][[m]]$ind_counts)
   })
-  
+    
+
   # Recall
+  # recall_directed <- lapply(seq_along(results), function(i){
+  #   try(recall(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
+  # })
   recall_directed <- lapply(seq_along(results), function(i){
-    try(recall(results[[i]][[m]]$dgp_path_counts, results[[i]][[m]]$path_counts))
+    Map("recall" ,results[[i]][[m]]$dgp_ind_counts, results[[i]][[m]]$ind_counts)
   })
   
   
@@ -415,13 +462,17 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   # Aggregate ARI
   ari_mean <- mean(unlist(ari_sub), na.rm = TRUE)
+  if(ari_mean < 0){
+    ari_mean = 0
+    }
   ari_sd <- sd(unlist(ari_sub), na.rm = TRUE)
+  ari_mcse <- sqrt((ari_mean*(1-ari_mean)) / replications)
   
   
   # Recall and Precision
   precision_directed_mean <- mean(unlist(precision_directed), na.rm = TRUE)
   precision_directed_mcse <- sqrt((precision_directed_mean*(1-precision_directed_mean)) / replications)
-  recall_directed_mean <- mean(unlist(precision_directed), na.rm = TRUE)
+  recall_directed_mean <- mean(unlist(recall_directed), na.rm = TRUE)
   recall_directed_mcse <- sqrt((recall_directed_mean*(1-recall_directed_mean)) / replications)
   
   
@@ -445,12 +496,15 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   
   # Output
   ret_mod <- c(ari_m = ari_mean,
-           # ari_sd = ari_sd,
+           ari_sd = ari_sd,
+           ari_mcse = ari_mcse,
            prec_dir_m = precision_directed_mean,
+           prec_dir_mcse = precision_directed_mcse,
            recall_dir_m = recall_directed_mean,
+           recall_dir_mcse = recall_directed_mcse,
            diff_paths_m = diff_path_counts_mean,
-           # bias_nonz_m = bias_nonzero_mean,
-           # bias_nonz_mcse = bias_nonzero_mcse,
+           bias_nonz_m = bias_nonzero_mean,
+           bias_nonz_mcse = bias_nonzero_mcse,
            bias_m = bias_mean,
            bias_mcse = bias_mcse
            )
@@ -467,7 +521,7 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   }
   
 
-  # ret <- unlist(ret)
+  ret <- unlist(ret)
   # try to cut names to certain length
   
   
@@ -484,26 +538,203 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
 ```{r}
 
 # for testing second row which throws errors
-sim_design_test <- sim_design[c(1),]
-sim_design_test$n_ind[1] <- 44
-replications = 2
+# sim_design_test <- sim_design[c(1),]
+# sim_design_test$n_ind[1] <- 80
+# replications = 2
 # rows 1,3,5 work
 # 2, 4 does not
 
-sim_res <- SimDesign::runSimulation(sim_design_test, 
+sim_res <- SimDesign::runSimulation(sim_design, 
                                     replications = replications, 
-                                    # save_results = TRUE,
+                                    save_results = TRUE,
                                     # store_results = TRUE, 
                                     generate = sim_generate, 
                                     analyse = sim_analyse_all,
                                     summarise = sim_summarize,
                                     # save = TRUE, 
-                                    # save_seeds = TRUE,
+                                    save_seeds = TRUE,
                                     packages = c("mvgimme", "here"), 
                                     fixed_objects = sim_pars,
                                     parallel = TRUE)
 SimClean()
 
+
+saveRDS(sim_res, file = here("output/sim_res.RDS"))
 ```
+
+Had to resummarize due to previous bugs, now fixed
+```{r}
+# sim_res <- SimDesign::reSummarise(sim_summarize,
+#                        dir = here("scripts/SimDesign-results_pc04669"))
+sim_res <- readRDS(here("output/sim_res.RDS"))
+
+```
+
+
+
+# Analyze results
+Prepare data to long format:
+```{r}
+sim_res_long <- sim_res %>% 
+  pivot_longer(cols = contains(c("default", "liberal", "strict", "threshold1")),
+               names_to = "name", values_to = "value") %>% 
+  select(n_ind, ind_a, ind_phi, name, value) %>% 
+  separate_wider_delim(cols = "name", delim = ".",
+                       names = c("method", "pm"))
+
+```
+
+
+
+Prepare visualizations: 
+```{r}
+palette_okabe_enh <- ggokabeito::palette_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))
+
+```
+First for bias: 
+```{r}
+fig_sim_bias <- sim_res_long %>% 
+  filter(pm == "bias_m" | pm == "bias_mcse") %>%
+  separate_wider_delim(cols = pm, delim = "_", names = c("pm", "stat")) %>% 
+  pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
+              names_from = stat, values_from = value) %>% 
+  mutate(ind_a = paste0("P(Ind. Cont.) = ", ind_a)) %>%
+  mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
+  mutate(across(c(n_ind, ind_a, ind_phi),
+                ~as.factor(.))) %>% 
+  ggplot(aes(x = n_ind, y = m, color = method, fill = method))+
+  geom_errorbar(aes(ymin = m - 1.96*mcse,
+                            ymax = m + 1.96*mcse),
+                        width = .8, 
+                 position = position_dodge(0.5),
+                 show.legend = FALSE)+
+  geom_point(position = position_dodge(width = 0.5))+
+  ggh4x::facet_nested(ind_phi~ind_a)+
+  theme_bs()+
+  scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  labs(y = "Bias",
+       x = "N")+
+  scale_y_continuous(lim = c(-0.05,0.1))
+fig_sim_bias
+
+ggsave("fig_sim_bias.pdf", fig_sim_bias, path = here("figures/"),
+       width = 9, height = 6)
+
+```
+
+Then for Recall:
+
+```{r}
+sim_res_long %>% 
+ filter(pm == "recall_dir_m" | pm == "recall_dir_mcse") %>%
+  separate_wider_delim(cols = pm, delim = "_dir_", names = c("pm", "stat")) %>% 
+  pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
+              names_from = stat, values_from = value) %>% 
+  mutate(ind_a = paste0("P(Ind. Cont.) = ", ind_a)) %>%
+  mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
+  mutate(across(c(n_ind, ind_a, ind_phi),
+                ~as.factor(.))) %>% 
+  ggplot(aes(x = n_ind, y = m, color = method, fill = method))+
+  geom_errorbar(aes(ymin = m - 1.96*mcse,
+                            ymax = m + 1.96*mcse),
+                        width = .8,
+                 position = position_dodge(0.5),
+                 show.legend = FALSE)+
+  geom_point(position = position_dodge(width = 0.5))+
+  ggh4x::facet_nested(ind_phi~ind_a)+
+  theme_bs()+
+  scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  labs(y = "Recall",
+       x = "N")
+
+
+```
+
+
+
+Then for Precision:
+```{r}
+sim_res_long %>% 
+ filter(pm == "prec_dir_m" | pm == "prec_dir_mcse") %>%
+  separate_wider_delim(cols = pm, delim = "_dir_", names = c("pm", "stat")) %>% 
+  pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
+              names_from = stat, values_from = value) %>% 
+  mutate(ind_a = paste0("P(Ind. Cont.) = ", ind_a)) %>%
+  mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
+  mutate(across(c(n_ind, ind_a, ind_phi),
+                ~as.factor(.))) %>% 
+  ggplot(aes(x = n_ind, y = m, color = method, fill = method))+
+  geom_errorbar(aes(ymin = m - 1.96*mcse,
+                            ymax = m + 1.96*mcse),
+                        width = .8,
+                 position = position_dodge(0.5),
+                 show.legend = FALSE)+
+  geom_point(position = position_dodge(width = 0.5))+
+  ggh4x::facet_nested(ind_phi~ind_a)+
+  theme_bs()+
+  scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  labs(y = "Precision",
+       x = "N")
+
+```
+
+
+Differences in Paths:
+```{r}
+sim_res_long %>% 
+  filter(pm == "diff_paths_m") %>%
+  # separate_wider_delim(cols = pm, delim = "_", names = c("pm", "stat")) %>%
+  # pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
+  #             names_from = stat, values_from = value) %>% 
+  mutate(ind_a = paste0("P(Ind. Cont.) = ", ind_a)) %>%
+  mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
+  mutate(across(c(n_ind, ind_a, ind_phi),
+                ~as.factor(.))) %>% 
+  ggplot(aes(x = n_ind, y = value, color = method, fill = method))+
+  # geom_errorbar(aes(ymin = m - 1.96*mcse,
+  #                           ymax = m + 1.96*mcse),
+  #                       width = .8, 
+  #                position = position_dodge(0.5),
+  #                show.legend = FALSE)+
+  geom_point(position = position_dodge(width = 0.5))+
+  ggh4x::facet_nested(ind_phi~ind_a)+
+  theme_bs()+
+  scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  labs(y = "Path Difference",
+       x = "N")
+```
+
+
+ARI:
+```{r}
+sim_res_long %>% 
+  filter(pm == "ari_m" | pm == "ari_mcse") %>%
+  # separate_wider_delim(cols = pm, delim = "_", names = c("pm", "stat")) %>%
+  # pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
+  #             names_from = stat, values_from = value) %>% 
+  mutate(ind_a = paste0("P(Ind. Cont.) = ", ind_a)) %>%
+  mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
+  mutate(across(c(n_ind, ind_a, ind_phi),
+                ~as.factor(.))) %>% 
+  ggplot(aes(x = n_ind, y = value, color = method, fill = method))+
+  # geom_errorbar(aes(ymin = m - 1.96*mcse,
+  #                           ymax = m + 1.96*mcse),
+  #                       width = .8, 
+  #                position = position_dodge(0.5),
+  #                show.legend = FALSE)+
+  geom_point(position = position_dodge(width = 0.5))+
+  ggh4x::facet_nested(ind_phi~ind_a)+
+  theme_bs()+
+  scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
+  labs(y = "ARI",
+       x = "N")
+
+```
+
 
 
