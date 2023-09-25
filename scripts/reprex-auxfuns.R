@@ -1,5 +1,3 @@
-# add simulateVARtest
-
 simulateVARtest <- function(A         = NULL, 
                             Phi       = NULL, 
                             Psi       = NULL, 
@@ -11,8 +9,6 @@ simulateVARtest <- function(A         = NULL,
                             indA      = 0.01, 
                             indPhi    = 0.01,
                             indPsi    = 0.00) {
-  
-  # browser()
   
   AList   <- list()
   PhiList <- list()
@@ -26,7 +22,6 @@ simulateVARtest <- function(A         = NULL,
     PhiList[[1]] <- Phi
   }
   
-  # BS: Added this: If Phi is a List, PhiList is empty now. This throws an error
   # 
   if(is.list(Phi)){
     PhiList <- Phi
@@ -92,10 +87,6 @@ simulateVARtest <- function(A         = NULL,
       PhiMean <- mean(PhiTemp)
       PsiMean <- mean(PsiTemp)
       
-      # BS: change such that indA applies to individual elements,
-      # not all elements of that person 
-      
-      
       
       if(indA>0){
         n.col.a <- ncol(ATemp)
@@ -154,7 +145,6 @@ simulateVARtest <- function(A         = NULL,
         PsiTemp[which(PsiTemp == 1)] <- stats::rnorm(1, PsiMean, 0.3)
       }
       
-      # BS: Return individual parameter lists
       indList[[ind]] <- list()
       # indList[[ind]]$AInd <- ATemp
       # indList[[ind]]$PhiInd <- PhiTemp
@@ -170,9 +160,7 @@ simulateVARtest <- function(A         = NULL,
       time1 <- matrix(0, nrow = vars, ncol = tp+400)
       
       
-      # BS: Gates et al. 2017, Eq. 3
       noise <- negA %*% t(MASS::mvrnorm(n = (tp+400),rep(0,vars),PsiTemp, empirical = TRUE))
-      # BS: this throws an non-conformable error if PsiTemp is not properly defined
       
       time[,1] <- noise[,1]
       
@@ -180,7 +168,6 @@ simulateVARtest <- function(A         = NULL,
       
       time[,2]  <- time1[,1]
       
-      # BS: Gates et al. 2017, Eq. 3
       for (t in 2:(tp+400)){
         time1[,t]  <- negA %*% PhiTemp %*% time[,(t)] + noise[,t]
         if (t<(tp+400))
@@ -189,11 +176,11 @@ simulateVARtest <- function(A         = NULL,
       go <- 0
       for (c in 1:length(time[,1])){
         adf_result <- suppressWarnings(tryCatch({aTSA::adf.test(time[c, ], out = FALSE)},
-                                                error = function(e) NA))       # BS: changed this
+                                                error = function(e) NA))       
         if(adf_result$type3[1,3]>0.05 || 
            is.na(adf_result$type3[1,3])
            ||
-           sum(abs(time[c, 400:(tp+400)])) > 10000)    # BS: add check for large values of timeseries
+           sum(abs(time[c, 400:(tp+400)])) > 10000)   
           go <- go + 1
         counter <- sum(counter, 1)
       }
@@ -216,9 +203,6 @@ simulateVARtest <- function(A         = NULL,
               indList = indList))
   
 }
-
-
-
 
 
 

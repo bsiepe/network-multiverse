@@ -1,38 +1,33 @@
 ---
-title: "reprex-simdesign"
+title: "gimme-cutoff-singleanalysis.Rmd"
 author: "Björn Siepe"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+This is a (somehwhat) minimal reprex for the issue explained in https://github.com/philchalmers/SimDesign/issues/26. 
 
-This is a minimal reprex to reproduce the variable naming error with `SimDesign`. 
 
-# Preparations
-```{r}
-library(gimme)
-library(SimDesign)
-library(here)
+# Preparation
+```{r packages}
+devtools::install_github("bsiepe/mv-gimme", subdir = "mvgimme")
+install.packages("perturbR")
+library(mvgimme)    # multiverse gimme
+library(perturbR)   # cluster solutions
+library(SimDesign)  # simulation design
+source("reprex-auxfuns.R")
 set.seed(35037)
-source(here::here("scripts/reprex-auxfuns.R"))
 ```
 
 
-# Generate
-Create simulation design:
-```{r}
-# Number of individuals
-n_ind <- 41
 
-# Autoregressive effect
-ar <- .2
-
-# Probability of individual contemporaneous effect
+# Simulation settings
+Create a design with different sample sizes and time series lengths.
+```{r sim-settings}
+# For testing only:
+n_ind <- c(44)
+ar <- c(.2)
 ind_a <- c(.15, .40)
-
-# Probability of individual temporal effect
 ind_phi <- c(.05, .25)
-
-# Sim repetitions 
 replications <- 500
 
 sim_design <- SimDesign::createDesign(n_ind = n_ind,
@@ -41,11 +36,6 @@ sim_design <- SimDesign::createDesign(n_ind = n_ind,
                                       ind_phi = ind_phi)
 
 
-```
-
-Create fixed DGPs:
-```{r}
-# Contemporaneous matrix
 a_1 <- matrix(c(
   0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
   0.00, 0.00, 0.25, 0.40, 0.00, 0.00,
@@ -64,8 +54,6 @@ change_a <- matrix(c(
   0, 0, -0.35000000,  0.00000000, 0,  0.00000000
 ), nrow = 6, byrow = TRUE)
 
-
-# Temporal matrix
 phi_1 <- matrix(c(
   ar, 0.00, 0.00, 0.00, 0.00, 0.00,
   0.00, ar, 0.00, 0.00, 0.10, 0.00,
@@ -85,12 +73,11 @@ change_phi <- matrix(c(
 phi_2 <- phi_1 + change_phi
 phi_list <- list(phi_1, phi_2)
 
-# White noise
 psi_mat <- matrix(data = rep(0, 36), nrow = 6, ncol = 6)
 diag(psi_mat) <- rep(1, 6)
 psi_list <- list(psi_mat, psi_mat)
 
-# Fixed parameters
+
 sim_pars <- list(
   tp = 100,
   phi_list = phi_list,
@@ -98,10 +85,14 @@ sim_pars <- list(
   psi_list = psi_list,
   change_a = change_a
 )
+
 ```
 
-Create data:
-```{r}
+
+
+# Data Generation
+
+```{r data-generation}
 sim_generate <- function(condition, 
                          fixed_objects = NULL){
   
@@ -149,11 +140,7 @@ sim_generate <- function(condition,
     }
   }
   
-  # save dgp
-  # uncommented for reprex
-  # saveRDS(sim_dat, file = paste0(here("output/simulation/sim_dat_"), n_ind, "_", tp,
-                                   # ".RDS"))
-  
+
   # list of data matrices
   l_dat <- lapply(sim_dat$dataList, function(x){
     as.matrix(x, ncol = nvar)
@@ -178,91 +165,13 @@ sim_generate <- function(condition,
   
   return(dat)
 }
-```
 
-
-# Analyze
-
-```{r}
-sim_analyse_gimme <- function(condition, dat, fixed_objects = NULL){
-  
-  # obtain fixed objects
-  Attach(fixed_objects)
-  
-  # save dgp parameters for later
-  dgp_ind_paths <- dat$ind_paths
-  dgp_path_counts <- dat$path_counts
-  dgp_sub_ind <- dat$group_ind
-  
-  # Initialize an empty list to store results
-  results <- list()
-  
-  # Perform the first analysis and store the result in the list
-  gimme_default <- try(gimme(data = dat$dat,
-                     ar = TRUE, 
-                     subgroup = TRUE,
-                     groupcutoff = 0.75,
-                     subcutoff = 0.75))
-  
-  
-  # Check if the gimme function call was successful
-  # if (inherits(gimme_default, "try-error")) {
-  #   # If there was an error, create a list with "NA" values for each element
-  #   results$default <- list(
-  #     path_counts = NA,
-  #     path_est_mats = NA,
-  #     sub_ind = NA,
-  #     dgp_path_counts = NA,
-  #     dgp_ind_paths = NA,
-  #     dgp_sub_ind = NA
-  #   )
-  # } else {
-    results$default <- list(
-      path_counts = gimme_default$path_counts,
-      path_est_mats = gimme_default$path_est_mats,
-      sub_ind = gimme_default$fit$sub_membership,
-      dgp_path_counts = dgp_path_counts,
-      dgp_ind_paths = dgp_ind_paths,
-      dgp_sub_ind = dgp_sub_ind
-    )
-  # }
-  
-  # Perform the second analysis and store the result in the list
-  gimme_liberal <- try(gimme(data = dat$dat,
-                     ar = TRUE, 
-                     subgroup = TRUE,
-                     groupcutoff = 0.50,
-                     subcutoff = 0.50))
-  
-  # if (inherits(gimme_liberal, "try-error")) {
-  #   # If there was an error, create a list with "NA" values for each element
-  #   results$liberal <- list(
-  #     path_counts = NA,
-  #     path_est_mats = NA,
-  #     sub_ind = NA,
-  #     dgp_path_counts = NA,
-  #     dgp_ind_paths = NA,
-  #     dgp_sub_ind = NA
-  #   )
-  # } else {
-    results$liberal <- list(
-      path_counts = gimme_liberal$path_counts,
-      path_est_mats = gimme_liberal$path_est_mats,
-      sub_ind = gimme_liberal$fit$sub_membership,
-      dgp_path_counts = dgp_path_counts,
-      dgp_ind_paths = dgp_ind_paths,
-      dgp_sub_ind = dgp_sub_ind
-    )
-  # }
-  
-  # Return the list of results
-  return(results)
-  
-}
 ```
 
 
 
+
+# Fitting functions
 
 ```{r}
 sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
@@ -279,11 +188,11 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
   results <- list()
   
   # Perform the first analysis and store the result in the list
-  gimme_default <- try(multiverse.gimme(data = dat$dat,
+  gimme_default <- multiverse.gimme(data = dat$dat,
                      ar = TRUE, 
                      subgroup = TRUE,
                      groupcutoffs = 0.75,
-                     subcutoffs = 0.75))
+                     subcutoffs = 0.75)
   
   results$default <- list(
     path_counts = gimme_default[[1]]$path_counts,
@@ -295,7 +204,7 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
   )
   
   # Perform the second analysis and store the result in the list
-  gimme_liberal <- try(multiverse.gimme(data = dat$dat,
+  gimme_liberal <- multiverse.gimme(data = dat$dat,
                      ar = TRUE, 
                      subgroup = TRUE,
                      groupcutoffs = 0.75,
@@ -303,7 +212,7 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
                      rmsea.cuts = 0.08,
                      srmr.cuts = 0.08,
                      nnfi.cuts = 0.90,
-                     cfi.cuts = 0.90))
+                     cfi.cuts = 0.90)
   
   results$liberal <- list(
     path_counts = gimme_liberal[[1]]$path_counts,
@@ -315,7 +224,7 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
   )
   
   # Perform the third analysis and store the result in the list
-  gimme_strict <- try(multiverse.gimme(data = dat$dat,
+  gimme_strict <- multiverse.gimme(data = dat$dat,
                      ar = TRUE, 
                      subgroup = TRUE,
                      groupcutoffs = 0.75,
@@ -323,7 +232,7 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
                      rmsea.cuts = 0.03,
                      srmr.cuts = 0.03,
                      nnfi.cuts = 0.97,
-                     cfi.cuts = 0.97))
+                     cfi.cuts = 0.97)
   
   results$strict <- list(
     path_counts = gimme_strict[[1]]$path_counts,
@@ -335,12 +244,12 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
   )
   
   # Perform the fourth analysis and store the result in the list
-  gimme_threshold1 <- try(multiverse.gimme(data = dat$dat,
+  gimme_threshold1 <- multiverse.gimme(data = dat$dat,
                         ar = TRUE, 
                         subgroup = TRUE,
                         groupcutoffs = 0.75,
                         subcutoffs = 0.75,
-                        n.excellent = 1))
+                        n.excellent = 1)
   
   results$threshold1 <- list(
     path_counts = gimme_threshold1[[1]]$path_counts,
@@ -354,21 +263,21 @@ sim_analyse_all <- function(condition, dat, fixed_objects = NULL) {
   # Return the list of results
   return(results)
 }
+
 ```
 
 
-# Summarize
 
-```{r}
+# Summary function
+
+```{r summary-function}
 sim_summarize <- function(condition, results, fixed_objects = NULL){
 
   
   ret <- list()
   #---- Loop over different analysis fns -----
   for(m in 1:length(results[[1]])){
-    
-  
-  
+
   #----- Subgroup ------
   ari_sub <- lapply(seq_along(results), function(i){
     
@@ -380,8 +289,7 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
     }
     
   })
-  
-  
+
   
   #----- Individual -----
   
@@ -434,7 +342,6 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
     return(l_tmp)
   })
   
-  # for MCSE formulas, see Morris et al. 2019 SIM
   bias_nonzero_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_nonzero_diff))
   bias_nonzero_mcse <- sqrt(sum(sapply(mean_bias_ests, function(x) x$var_nonzero_diff)) / (replications * (replications - 1)))
   bias_mean <- abs_mean(sapply(mean_bias_ests, function(x) x$mean_diff))
@@ -456,10 +363,12 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   ret_mod <- unlist(ret_mod)
   ret[[m]] <- ret_mod
   
+  
   names(ret)[m] <- names(results[[1]])[m]
 
   
   }
+  
 
   return(ret)
 }
@@ -468,31 +377,23 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
 
 
 
-
-# Run Simulation
+# Execute Simulation
 
 ```{r}
-# For testing use first condition only
-sim_design_test <- sim_design[1,]
-replications = 3
+# for testing 
+sim_design_test <- sim_design[c(1),]
+replications = 2
 
 sim_res <- SimDesign::runSimulation(sim_design_test, 
                                     replications = replications, 
-                                    # save_results = TRUE,
-                                    # store_results = TRUE, 
                                     generate = sim_generate, 
                                     analyse = sim_analyse_all,
                                     summarise = sim_summarize,
-                                    # save = TRUE, 
-                                    # save_seeds = TRUE,
-                                    packages = c("here"), 
+                                    packages = c("mvgimme"), 
                                     fixed_objects = sim_pars,
-                                    parallel = TRUE,
-                                    debug = "summarise")
+                                    parallel = TRUE)
 SimClean()
 
 ```
-
-
 
 
