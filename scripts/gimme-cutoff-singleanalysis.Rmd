@@ -23,6 +23,9 @@ library(SimDesign)  # simulation design
 library(here)
 library(ggokabeito)
 library(ggh4x)
+library(knitr)
+library(kableExtra)
+library(cowplot)
 source(here::here("scripts/aux_funs.R"))
 
 ```
@@ -573,6 +576,43 @@ sim_res <- readRDS(here("output/sim_res.RDS"))
 
 
 # Analyze results
+Convergence:
+Summarize results for convergence:
+```{r}
+sum_conv <- function(condition, results, fixed_objects = NULL){
+  ret <- list()
+  for(m in 1:length(results[[1]])){
+  conv_res <- lapply(seq_along(results), function(i){
+      length(results[[i]][[m]]$path_est_mats)
+    })
+   
+  v_conv_res <- unlist(conv_res)
+  mean_conv <- mean(v_conv_res, na.rm =TRUE)
+  max_conv <- max(v_conv_res, na.rm = TRUE)
+  nonmax_conv <- sum(mean_conv != max_conv)
+  
+  ret[[m]] <- list(mean_conv = mean_conv,
+                   nonmax_conv = nonmax_conv) 
+  names(ret)[m] <- names(results[[1]])[m]
+  }
+  
+  ret <- unlist(ret)
+  return(ret)
+  
+}
+```
+
+
+Resummarize again:
+```{r}
+sim_nonconv <- SimDesign::reSummarise(sum_conv, 
+                       dir = here("scripts/SimDesign-results_pc04669"))
+saveRDS(sim_nonconv, here("output/sim_nonconv.RDS"))
+```
+
+
+
+
 Prepare data to long format:
 ```{r}
 sim_res_long <- sim_res %>% 
@@ -626,7 +666,7 @@ ggsave("fig_sim_bias.pdf", fig_sim_bias, path = here("figures/"),
 Then for Recall:
 
 ```{r}
-sim_res_long %>% 
+fig_recall <- sim_res_long %>% 
  filter(pm == "recall_dir_m" | pm == "recall_dir_mcse") %>%
   separate_wider_delim(cols = pm, delim = "_dir_", names = c("pm", "stat")) %>% 
   pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
@@ -635,19 +675,23 @@ sim_res_long %>%
   mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
   mutate(across(c(n_ind, ind_a, ind_phi),
                 ~as.factor(.))) %>% 
-  ggplot(aes(x = n_ind, y = m, color = method, fill = method))+
+  rename(Method = method) %>% 
+  ggplot(aes(x = n_ind, y = m, color = Method, fill = Method))+
   geom_errorbar(aes(ymin = m - 1.96*mcse,
                             ymax = m + 1.96*mcse),
                         width = .8,
                  position = position_dodge(0.5),
                  show.legend = FALSE)+
   geom_point(position = position_dodge(width = 0.5))+
-  ggh4x::facet_nested(ind_phi~ind_a)+
+  ggh4x::facet_nested(ind_phi~ind_a,
+                      scales = TRUE,
+                      axes = "all")+
   theme_bs()+
   scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
   scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
   labs(y = "Recall",
-       x = "N")
+       x = "N")+
+  scale_y_continuous(limits = c(0.25,1))
 
 
 ```
@@ -656,7 +700,7 @@ sim_res_long %>%
 
 Then for Precision:
 ```{r}
-sim_res_long %>% 
+fig_precision <- sim_res_long %>% 
  filter(pm == "prec_dir_m" | pm == "prec_dir_mcse") %>%
   separate_wider_delim(cols = pm, delim = "_dir_", names = c("pm", "stat")) %>% 
   pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
@@ -665,19 +709,42 @@ sim_res_long %>%
   mutate(ind_phi = paste0("P(Ind. Temp.) = ", ind_phi)) %>%
   mutate(across(c(n_ind, ind_a, ind_phi),
                 ~as.factor(.))) %>% 
-  ggplot(aes(x = n_ind, y = m, color = method, fill = method))+
+  rename(Method = method) %>% 
+  ggplot(aes(x = n_ind, y = m, color = Method, fill = Method))+
   geom_errorbar(aes(ymin = m - 1.96*mcse,
                             ymax = m + 1.96*mcse),
                         width = .8,
                  position = position_dodge(0.5),
                  show.legend = FALSE)+
   geom_point(position = position_dodge(width = 0.5))+
-  ggh4x::facet_nested(ind_phi~ind_a)+
+  ggh4x::facet_nested(ind_phi~ind_a,
+                      scales = "free",
+                      axes = "all")+
   theme_bs()+
   scale_fill_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
   scale_color_okabe_ito(order = c(5,1,3,4,2,6,7,8,9))+
   labs(y = "Precision",
-       x = "N")
+       x = "N")+
+  theme(legend.position = "right")+
+  scale_y_continuous(limits = c(0.25,1))
+
+```
+
+Combine figures:
+```{r}
+leg <- get_legend(fig_precision)
+
+plot_prec_rec_sim <- cowplot::plot_grid(
+  fig_precision + theme(legend.position = "right"), 
+  fig_recall + theme(legend.position = "right"),
+  labels = c("Precision", "Recall"),
+  nrow = 2,
+  label_fontfamily = "news")
+
+plot_prec_rec_sim
+
+ggsave("plot_prec_rec_sim.pdf", plot_prec_rec_sim, path = here("figures/"),
+       width = 10, height = 10)
 
 ```
 
@@ -709,6 +776,10 @@ sim_res_long %>%
 ```
 
 
+
+
+
+
 ARI:
 ```{r}
 sim_res_long %>% 
@@ -736,5 +807,35 @@ sim_res_long %>%
 
 ```
 
+## Tabular results
+Create one long table
 
+```{r}
+table_sim <- sim_res_long %>% 
+  separate(col = pm, sep = "_(?!.*_)", into = c("pm", "stat")) %>% 
+  pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, method, pm), 
+              names_from = stat, values_from = value) %>% 
+  select(!sd) %>%
+  # Only focus on some results here
+  filter(pm != "diff_paths") %>% 
+  filter(pm != "bias_nonz") %>% 
+  mutate(value = paste0(round(m, digits = 3), " (", round(mcse, digits = 3), ")")) %>% 
+  select(!c(m, mcse)) %>% 
+  pivot_wider(id_cols = c(n_ind, ind_a, ind_phi, pm),
+              names_from = method,
+              values_from = value) %>% 
+  mutate(pm = case_match(pm,
+                         "ari" ~ "ARI",
+                         "prec_dir" ~ "Precision",
+                         "recall_dir" ~ "Recall",
+                         "bias" ~ "Bias")) %>% 
+  mutate(DGP = paste0("N = ", n_ind , "\n",
+                      "Ind(A) = ", ind_a, "\n",
+                      "Ind(Phi) = ", ind_phi)) %>% 
+  select(!c(n_ind, ind_a, ind_phi)) %>% 
+  select(DGP, everything()) %>% 
+  knitr::kable("latex", longtable = TRUE)
+  
+  
+```
 
