@@ -16,9 +16,44 @@ cond_vars <- c("groupcutoffs", "subcutoffs", "rmsea.cuts", "srmr.cuts",
                "nnfi.cuts", "cfi.cuts", "n.excellent")
 summary_vars <- c("Heterogeneity", 
                   # "VI", "ARI", "Modularity",
-                  "Nonzero Edge Diff.", "Adj. Diff.", "Cent. Diff.", 
-                  "Abs. Diff. Density Temp.", "Abs. Diff. Density Cont.")
+                  "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.", 
+                  "Density Temp. Abs. Diff.", "Density Cont. Abs. Diff.")
 
+# --- Create actual data sets
+# Personality
+# comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
+# 
+# comp_pers_app <- comp_pers %>%
+#     dplyr::rename(Heterogeneity = heterogeneity_g,
+#                   VI = vi,
+#                   ARI = ari,
+#                   Modularity = modularity,
+#                   "Nonzero Edge Diff." = mean_nonzero_diff_edge_i,
+#                   "Adjacency Diff." = diff_adj_sum_mean_i,
+#                   "Centrality Diff." = mean_diff_cent_i,
+#                   "Density Temp. Abs. Diff." = mean_abs_diff_dens_temp_i,
+#                   "Density Cont. Abs. Diff." = mean_abs_diff_dens_cont_i) %>%
+#     tidyr::unnest(Heterogeneity) %>%
+#     dplyr::select(all_of(summary_vars), all_of(cond_vars))
+# 
+# comp_emot <- readRDS(here("output/mv_emotion/comp_emot51.RDS"))
+# 
+# comp_emot_app <- comp_emot %>%
+#   dplyr::rename(Heterogeneity = heterogeneity_g,
+#                 VI = vi,
+#                 ARI = ari,
+#                 Modularity = modularity,
+#                 "Nonzero Edge Diff." = mean_nonzero_diff_edge_i,
+#                 "Adjacency Diff." = diff_adj_sum_mean_i,
+#                 "Centrality Diff." = mean_diff_cent_i,
+#                 "Density Temp. Abs. Diff." = mean_abs_diff_dens_temp_i,
+#                 "Density Cont. Abs. Diff." = mean_abs_diff_dens_cont_i) %>%
+#   tidyr::unnest(Heterogeneity) %>%
+#   dplyr::select(all_of(summary_vars), all_of(cond_vars))
+# 
+# 
+# saveRDS(comp_pers_app, here("shiny-app/data/comp_pers_app.RDS"))
+# saveRDS(comp_emot_app, here("shiny-app/data/comp_emot_app.RDS"))
 
 
 # # --- Data for testing
@@ -48,14 +83,25 @@ summary_vars <- c("Heterogeneity",
 # saveRDS(comp_test2, here("shiny-app/data/comp_test_emot.RDS"))
 
 #--- Plots data set
-# TODO add emotion to it
+# Personality
 # mv_res_pers <- readRDS(here("output/mv_personality/mv_res_pers2.RDS"))
-
+# 
 # mv_res_plots <- lapply(mv_res_pers, function(x) {
+#    x[c("group_plot_paths", "path_counts")]
+#  })
+# 
+# saveRDS(mv_res_plots, here("shiny-app/data/mv_pers_plots.RDS"))
+# rm(mv_res_pers, mv_res_plots)
+# 
+# # Emotion
+# mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot_new51.RDS"))
+# mv_res_plots <- lapply(mv_res_emot, function(x) {
 #   x[c("group_plot_paths", "path_counts")]
 # })
-# saveRDS(mv_res_plots, here("shiny-appdata/mv_pers_plots.RDS"))
+# 
 # saveRDS(mv_res_plots, here("shiny-app/data/mv_emot_plots.RDS"))
+# rm(mv_res_emot, mv_res_plots)
+
 
 #--- ggplot Theming
 theme_multiverse <- function() {
@@ -196,13 +242,12 @@ plot_specification <- function(mv_res,
 palette_3 <- colorRampPalette(brewer.pal(9, "RdBu"))(3)
 palette_4 <- colorRampPalette(brewer.pal(9, "RdBu"))(4)
 
-# TODO change blue color values
 
 # Set values explicitly 
 palette_full <- c(palette_4[1:2], "lightblue", palette_4[3:4])
 names(palette_full) <- c("liberal", "medium-liberal", "medium", "medium-strict", "strict")
 
-# Define the desired levels for each factor
+# Define desired levels for each factor
 group_cuts <- c(.50, .60, .75, .80)
 sub_cuts <- c(.50, .60, .75, .80)
 rmsea_cuts <- c(.03, .05, .08)
@@ -210,13 +255,14 @@ srmr_cuts <- c(.03, .05, .08)
 nnfi_cuts <- c(.90, .95, .97)
 cfi_cuts <- c(.90, .95, .97)
 n_excels <- c(1, 2, 3)
+
 group_levels <- c("liberal", "medium-liberal", "medium-strict", "strict")
 sub_levels <- c("liberal", "medium-liberal", "medium-strict", "strict")
 rmsea_levels <- c("strict", "medium", "liberal")
 srmr_levels <- c("strict", "medium", "liberal")
 nnfi_levels <- c("liberal", "medium", "strict")
 cfi_levels <- c("liberal", "medium", "strict")
-n_excels_levels <- c("strict", "medium", "liberal")
+n_excels_levels <- c("liberal", "medium", "strict")
 
 multiverse_grid <- expand.grid(
   group_cuts = group_cuts,
@@ -249,13 +295,12 @@ ui <- fluidPage(
              tags$div(
                class = "well",
                tags$h2("How to use this app"),
-               tags$p("Welcome to the Network Multiverse Shiny App! This interactive tool as a supplement to the analyses in our manuscript on Multiverse analysis in dynamic networks.."),
+               tags$p("Welcome to the Network Multiverse Shiny App! This interactive tool is a supplement to the analyses in our manuscript on Multiverse analysis in dynamic networks.."),
                tags$p("Follow these steps to use the app:"),
                tags$ol(
                  tags$li("Select a dataset from the dropdown menu below. Choose between 'Personality' and 'Emotion'."),
                  tags$li("Below, you will find an explanation of the variable abbrevations used in this app."),
                  tags$li("Explore the various tabs to analyze the data and visualize insights."),
-                 tags$li("Use the interactive features to compute summary statistics and create different plots."),
                ),
                tags$h2("For more information"),
                tags$p("If you need more details about the methodology behind the research, please refer to the corresponding sections in our paper."),
@@ -269,6 +314,7 @@ ui <- fluidPage(
              textOutput("dataset_info"),
              # Display the variable explanation table
              h2("Variable Name Explanations"),
+             p("All differences here are calculated as reference fit - multiverse fit. For example, a negative density difference means that the multiverse fit has a higher density."),
              tableOutput("variable_table")
            )
   ),
@@ -326,7 +372,7 @@ ui <- fluidPage(
                  class = "well",
                  tags$h3("Specification Curve Analysis"),
                  tags$p("A Specification Curve Analysis (SCA) plot is a visual tool used to analyze the effects of a variable across different specifications."),
-                 tags$p("Select a variable from the dropdown menu to explore its impact as ordered by their size across specifications."),
+                 tags$p("Select a variable from the dropdown menu to explore its impact as ordered by its size across specifications."),
                  tags$p("Rendering of the plot can take some time. This plot is not interactive to speed up computation time."),
                  selectInput("sca_column",
                              label = "Select Column:",
@@ -402,9 +448,9 @@ server <- function(input, output, session) {
     dataset_name <- input$dataset
     
     if(dataset_name == "Personality") {
-      return(readRDS("data/comp_test_pers.RDS"))
+      return(readRDS("data/comp_pers_app.RDS"))
     } else if (dataset_name == "Emotion") {
-      return(readRDS("data/comp_test_emot.RDS"))
+      return(readRDS("data/comp_emot_app.RDS"))
     }
   })
   
@@ -425,15 +471,15 @@ server <- function(input, output, session) {
   
   #--- Variables explained
   variable_data <- data.frame(
-    Variable = c("Heterogeneity", "Nonzero Edge Diff.", "Adj. Diff.", "Cent. Diff.",
-                 "Abs. Diff. Density Temp.", "Abs. Diff. Density Cont."),
+    Variable = c("Heterogeneity", "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.",
+                 "Density Temp. Abs. Diff.", "Density Cont. Abs. Diff."),
     Explanation = c(
       "Proportion of group-level edges to all edges.",
       "Difference between nonzero edges.",
       "Adjusted difference.",
       "Centrality difference.",
-      "Absolute difference density for temporal network.",
-      "Absolute difference density for contemporaneous network."
+      "Absolute difference of density for temporal network.",
+      "Absolute difference of density for contemporaneous network."
     )
   )
   
