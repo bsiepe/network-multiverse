@@ -315,6 +315,7 @@ ui <- fluidPage(
              # Display the variable explanation table
              h2("Variable Name Explanations"),
              p("All differences here are calculated as reference fit - multiverse fit. For example, a negative density difference means that the multiverse fit has a higher density."),
+             p("Also, note that the lowest subgroup cutoff for the emotion data set is 51% instead of 50%, which is explained in the manuscript."),
              tableOutput("variable_table")
            )
   ),
@@ -476,7 +477,7 @@ server <- function(input, output, session) {
     Explanation = c(
       "Proportion of group-level edges to all edges.",
       "Difference between nonzero edges.",
-      "Adjusted difference.",
+      "Adjacency matrix difference.",
       "Centrality difference.",
       "Absolute difference of density for temporal network.",
       "Absolute difference of density for contemporaneous network."
