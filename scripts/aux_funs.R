@@ -1016,57 +1016,12 @@ multiverse.compare.individual <- function(l_res,
     }
   })
   
-  ########################
-  #--- Nonconverg. Checks
-  ########################
-  # TODO
-  # can only add this after I have seen some actual nonconvergence
-  
-  
-  ########################
-  #--- Plausibility Checks
-  ########################
-  
-  # Check diagonal of Psi (contemporaneous) matrix
-  # Values should be >= 0 & <= 1
-  # inspired by https://github.com/aweigard/GIMME_AR_simulations/blob/master/analyze_recovery_Balanced.R
-  # 1 means implausible value somewhere in psi matrix
-  # l_implausible <- lapply(l_res, function(x){
-  #   unlist(lapply(x$path_est_mats, function(y){
-  #     if(!is.double(y)){
-  #       NA
-  #     }
-  #     else{
-  #       sum(ifelse(any(diag(y[,temp_ind]) < 0 | diag(y[,temp_ind]) > 1) , 1, 0))
-  #     }
-  #     
-  #   }))
-  # })
-  # sum_implausible <- sapply(l_implausible, sum)   # this might throw an error if parts are NA
+
   
   
   ########################
   #--- Compare Edges
   ########################
-  #--- Nondirectional recovery
-  # Only for contemporaneous effects
-  # ref_nondir_adj_mats <- lapply(ref_path_est_mats, function(x){
-  #   tmp <- ifelse(x[,cont_ind] != 0, 1, 0)
-  #   tmp <- nondirect_adjacency(tmp)
-  #   return(tmp)
-  # })
-  # 
-  # l_diff_nondir_adj <- lapply(l_res, function(x){
-  #   tmp_nondir_adj_mats <- lapply(x$path_est_mats, function(y){
-  #     tmp <- ifelse(y[,cont_ind] != 0, 1, 0)
-  #     tmp <- nondirect_adjacency(tmp)
-  #     return(tmp)
-  #   })
-  #   l_nondir_adj <- Map('-', ref_nondir_adj_mats, tmp_nondir_adj_mats)
-  #   lapply(l_nondir_adj, function(y){as.matrix(y)})
-  #   
-  # })
-  
   #--- Directional recovery
   l_diff_adj <- lapply(l_res, function(x){
     ## adjacency matrices
@@ -1204,24 +1159,35 @@ multiverse.compare.individual <- function(l_res,
   # then summarize this again
   # split by averaging over all nonzero differences, or all differences
   
-  #--- Nondirected adjacency
-  # mean_diff_nondir_adj <- lapply(l_diff_nondir_adj, function(x){
+  #--- Adjacency matrix
+  # mean_diff_adj <- lapply(l_diff_adj, function(x){
   #   l_tmp <- list()
-  #   l_tmp$diff_nondir_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-  #   l_tmp$diff_nondir_adj_sum_sum_i <- sum(l_tmp$nondir_adj_sum_mat)
-  #   l_tmp$diff_nondir_adj_sum_mean_i <- mean(l_tmp$nondir_adj_sum_mat)
+  #   # Filter entries that are NA (and therefore saved as 1x1 integer)
+  #   x <- Filter(function(entry) is.double(entry), x)
+  #     # takes sum across individuals for each edge within a specification
+  #     l_tmp$diff_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
+  #     # takes the sum of sums
+  #     l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+  #     # Takes the mean across the sum of different edges for a specification
+  #     l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+  # 
   #   return(l_tmp)
   # })
   
-  #--- Adjacency matrix
+  # New version: per individual differences
   mean_diff_adj <- lapply(l_diff_adj, function(x){
     l_tmp <- list()
     # Filter entries that are NA (and therefore saved as 1x1 integer)
     x <- Filter(function(entry) is.double(entry), x)
-      l_tmp$diff_adj_sum_mat_i <- apply(simplify2array(x), 1:2, abs_sum)
-      l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
-      l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
-
+    # takes sum across edges for each individual within a specification
+    l_tmp$diff_adj_sum_mat_i <- lapply(x, function(y){
+      sum(y)
+    })
+    # takes the sum of sums
+    l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+    # Takes the mean across the sum of different individuals for a specification
+    l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+    
     return(l_tmp)
   })
   
@@ -1428,6 +1394,7 @@ theme_bs <- function(){
     ggplot2::theme(
       # remove minor grid
       panel.grid.minor = ggplot2::element_blank(),
+      axis.line = element_line(colour = "#6d6d6e"),
       # Title and Axis Texts
       plot.title = ggplot2::element_text(face = "plain", size = ggplot2::rel(1.2), hjust = 0.5),
       plot.subtitle = ggplot2::element_text(size = ggplot2::rel(1.1), hjust = 0.5),
