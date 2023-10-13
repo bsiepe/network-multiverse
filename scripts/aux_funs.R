@@ -1181,12 +1181,12 @@ multiverse.compare.individual <- function(l_res,
     x <- Filter(function(entry) is.double(entry), x)
     # takes sum across edges for each individual within a specification
     l_tmp$diff_adj_sum_mat_i <- lapply(x, function(y){
-      sum(y)
+      abs_sum(y)
     })
     # takes the sum of sums
-    l_tmp$diff_adj_sum_sum_i <- sum(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+    l_tmp$diff_adj_sum_sum_i <- abs_sum(unlist(l_tmp$diff_adj_sum_mat_i))
     # Takes the mean across the sum of different individuals for a specification
-    l_tmp$diff_adj_sum_mean_i <- mean(l_tmp$diff_adj_sum_mat_i, na.rm = TRUE)
+    l_tmp$diff_adj_sum_mean_i <- abs_mean(unlist(l_tmp$diff_adj_sum_mat_i))
     
     return(l_tmp)
   })
