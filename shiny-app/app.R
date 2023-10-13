@@ -21,7 +21,7 @@ summary_vars <- c("Heterogeneity",
 
 # --- Create actual data sets
 # Personality
-# comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
+# comp_pers <- readRDS(here("output/mv_personality/comp_pers_upd.RDS"))
 # 
 # comp_pers_app <- comp_pers %>%
 #     dplyr::rename(Heterogeneity = heterogeneity_g,
@@ -36,7 +36,7 @@ summary_vars <- c("Heterogeneity",
 #     tidyr::unnest(Heterogeneity) %>%
 #     dplyr::select(all_of(summary_vars), all_of(cond_vars))
 # 
-# comp_emot <- readRDS(here("output/mv_emotion/comp_emot51.RDS"))
+# comp_emot <- readRDS(here("output/mv_emotion/comp_emot_upd.RDS"))
 # 
 # comp_emot_app <- comp_emot %>%
 #   dplyr::rename(Heterogeneity = heterogeneity_g,
