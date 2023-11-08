@@ -6,7 +6,7 @@ Full results of the multiverse analyses are too large and can be requested from 
 ## Structure
 
 ### `data/`
-Contains the fitted models for the reference analysis. The raw data can be obtained from the original publications which are linked in the preprint.
+Contains the fitted models for the reference analysis, as well as detrended vs. non-detrended results. The raw data can be obtained from the original publications which are linked in the preprint.
 
 ### `output/`
 Contains the summarized results of both the multiverse analyses as well as the supplementary simulation study.
