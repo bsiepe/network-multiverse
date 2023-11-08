@@ -71,7 +71,6 @@ sim_design <- SimDesign::createDesign(n_ind = n_ind,
                                       ind_phi = ind_phi)
 
 
-# TODO double check if this works with change_phi and change_a
 a_1 <- matrix(c(
   0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
   0.00, 0.00, 0.25, 0.40, 0.00, 0.00,
@@ -516,19 +515,14 @@ sim_summarize <- function(condition, results, fixed_objects = NULL){
   ret[[m]] <- ret_mod
   
   
-  # TODO maybe switch this on again
+  
   names(ret)[m] <- names(results[[1]])[m]
-  # Add model name
-  # names(ret[[m]]) <- paste0(names(ret[[m]]), names(results[[1]])[m])
+
   
   }
   
 
   ret <- unlist(ret)
-  # try to cut names to certain length
-  
-  
-  # ret <- unname(ret)
   return(ret)
 }
 ```

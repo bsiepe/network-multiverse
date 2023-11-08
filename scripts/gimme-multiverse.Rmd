@@ -61,7 +61,6 @@ multiverse_grid <- expand.grid(
 
 ## Personality Dataset
 ```{r multiverse-personality}
-# for testing
 data_list <- readRDS(here("data/wright_2019/data_list.RDS"))
 tic()
 mv_res_pers <- mvgimme::multiverse.gimme(data = here("data/wright_2019/individual_files"),
@@ -300,7 +299,6 @@ sd(comp_pers$diff_adj_sum_mean_i)
 
 
 Adjacency matrix differences, summed across all individuals within a specification.
-TODO this does not account for contemporaneous 
 ```{r}
 # Check if there are individuals for whom there was a greater difference
 # Custom function to add matrices element-wise
@@ -312,11 +310,6 @@ add_matrices <- function(matrix_list) {
   reduce_matrix
 }
 
-
-# Added contemporaneous indicator manually
-# result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
-#   add_matrices(lapply(comp_pers$l_diff_adj_i, function(element) element[[matrix_name]][,7:12]))
-# })
 
 # both contemporaneous and temporal
 result <- lapply(names(comp_pers$l_diff_adj_i[[1]]), function(matrix_name) {
@@ -502,8 +495,6 @@ n_group_effects/n_all_effects
 #### Subgroup-Level
 Number and size of subgruops
 ```{r}
-# summary(unlist(comp_emot$n_sub_g)) # there is an error here for now
-# TODO change back after recomputing
 table(unlist(lapply(mv_res_emot, function(x){
   length(unique(x$fit$sub_membership))
 })))
@@ -629,8 +620,6 @@ Preparation:
 palette_3 <- colorRampPalette(brewer.pal(9, "RdBu"))(3)
 palette_4 <- colorRampPalette(brewer.pal(9, "RdBu"))(4)
 
-# TODO change blue color values
-
 # Set values explicitly 
 palette_full <- c(palette_4[1:2], "lightblue", palette_4[3:4])
 names(palette_full) <- c("liberal", "medium-liberal", "medium", "medium-strict", "strict")
@@ -680,7 +669,6 @@ rm(spec_plot_adj_pers)
 ### Network Multiverse
 Network multiverse plot
 ```{r}
-# TODO add better legend/node labels here
 pdf(here("figures/mv_net_pers.pdf"), width = 8, height = 4)
 multiverse.network(comp_pers, cutoff = .05, title.cex = 1, label.cex = 1.2, n_ind = 94,
                    fade = TRUE)
@@ -1032,6 +1020,19 @@ rm(plot_out_dens_emot_pct)
 rm(plot_spec_dens_emot_pct)
 rm(spec_plot_dens_emot)
 
+
+
+```
+
+
+
+# Session Info
+```{r}
+# create session info
+# save as .txt in the main folder
+sink("session_info.txt")
+sessionInfo()
+sink()
 
 
 ```
