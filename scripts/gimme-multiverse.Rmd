@@ -5,7 +5,8 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-In this document, we perform multiverse analysis for two datasets.
+In this document, we perform a multiverse analysis for two datasets. 
+The first dataset is the personality dataset from Wright et al. (2019). The second dataset is the emotion dataset from Kullar et al. (2023).
 
 
 # Preparation
@@ -140,19 +141,23 @@ ref_fit_pers <- mv_res_pers[[ref_fit_ind]]
 mv_res_pers <- mv_res_pers[-ref_fit_ind]
 
 
-# FOR TESTING ONLY
-short_mv_res_pers <- mv_res_pers[1:50]
-comp_test <- multiverse.compare(short_mv_res_pers, ref_fit_pers, n_ind = 94)
-saveRDS(comp_test, here("Network-Multiverse/data/comp_test_pers.RDS"))
-
-
-
 tic()
 comp_pers <- multiverse.compare(mv_res_pers, ref_fit_pers)
 toc() # 1439.33 sec elapsed
 # saveRDS(comp_pers, here("output/mv_personality/comp_pers_upd.RDS"))
 comp_pers <- readRDS(here("output/mv_personality/comp_pers_upd.RDS"))
 ```
+
+
+Save a smaller version of the results for sharing the data. The full results are too large, so we only share data used for the main results in the manuscript. This means that we cannot share some of the individual results (e.g. computation based on individual path matrices). The full data are, of course, available upon request. 
+```{r}
+comp_pers_small <- comp_pers %>% 
+  select(!c(l_adj_i, med_diff_edge_i, med_diff_fit_i, l_diff_ests_i, l_diff_adj_i))
+saveRDS(comp_pers_small, here("output/mv_personality/comp_pers_small.RDS"))
+
+```
+
+
 
 
 
@@ -419,6 +424,17 @@ comp_emot <- readRDS(here("output/mv_emotion/comp_emot_upd.RDS"))
 
 ```
 
+Save a smaller version of the results for sharing the data. The full results are too large, so we only share data used for the main results in the manuscript. This means that we cannot share some of the individual results (e.g. computation based on individual path matrices). The full data are, of course, available upon request. 
+```{r}
+comp_emot_small <- comp_emot %>% 
+  select(!c(l_adj_i, med_diff_edge_i, med_diff_fit_i, l_diff_ests_i, l_diff_adj_i))
+saveRDS(comp_emot_small, here("output/mv_emotion/comp_emot_small.RDS"))
+
+```
+
+
+
+
 
 Sanity check comparison: 
 ```{r}
@@ -436,7 +452,7 @@ g_75_51_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finalout
                                          n.excellent = 2,
                                          prune_output = TRUE,
                                          exogenous = "TimeofDay")
-saveRDS(g_75_51_emot, here("output/mv_emotion/g_75_51_emot.RDS"))
+# saveRDS(g_75_51_emot, here("output/mv_emotion/g_75_51_emot.RDS"))
 
 # check subgrouping
 g_75_51_emot[[1]]$path_counts - ref_fit_emot_og$path_counts

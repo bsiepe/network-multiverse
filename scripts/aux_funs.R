@@ -520,7 +520,6 @@ multiverse.network <- function(mv_res,
 
   
   # Convert to proportions
-  # TODO divide by number of individuals
   prop_mat <- count_mat / (nrow(mv_res) * n_ind)
   
   # Cutoff option
