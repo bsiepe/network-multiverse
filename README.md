@@ -6,10 +6,10 @@ Full results of the multiverse analyses are too large and can be requested from 
 ## Structure
 
 ### `data/`
-Contains the raw data to reproduce our empirical analyses
+Contains the fitted models for the reference analysis. The raw data can be obtained from the original publications which are linked in the preprint.
 
 ### `output/`
-Contains the summarized results of both the multiverse analyses as well as the supplementary simulation study
+Contains the summarized results of both the multiverse analyses as well as the supplementary simulation study.
 
 ### `scripts/`
 Contains all scripts needed to reproduce the results. The main analysis script is **gimme-multiverse.Rmd**. 
@@ -44,4 +44,4 @@ Alternatively, you can clone the GitHub repository, navigate to the file `shiny-
 shiny::runApp()
 ```
 
-If you happen to have any problems with the code, or any suggestions for further improvement, feel free to contact me via the email listed in my GitHub account. 
+If you happen to have any problems with the code or any suggestions for further improvement, feel free to contact me via the email listed in my GitHub account. 
