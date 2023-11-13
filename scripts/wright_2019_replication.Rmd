@@ -95,11 +95,11 @@ sd(unlist(lapply(data_list, nrow)))
 
 
 # Fit Model
-We do not use detrended data, as not detrending let's us replicate the original analysis. 
+We do not use detrended data, as not detrending lets us replicate the original analysis. 
 
 ```{r fit-gimme}
 fit <- gimme(
-  data = "data/wright_2019/individual_files",
+  data = data_list_detrend,
   out = "data/wright_2019/gimme_output",
   sep = ",",
   header = TRUE,
@@ -107,15 +107,19 @@ fit <- gimme(
   plot = TRUE,         
   subgroup = TRUE,     
   hybrid = FALSE,      
-  groupcutoff = .75,   # unclear
-  subcutoff = .50     # unclear
-  # standardize = TRUE   # try to handle variance issues
+  groupcutoff = .75,   
+  subcutoff = .50     
 )
 # saveRDS(fit, "data/wright_2019/wright_2019_fit_detrend.RDS")
 fit <- readRDS("data/wright_2019/wright_2019_fit_nondetrend.RDS")
 
 ```
 
+
+Alternatively, load the model fit with detrended data:
+```{r fit-gimme-detrend}
+fit <- readRDS("data/wright_2019/wright_2019_fit_detrend.RDS")
+```
 
 
 # Summaries

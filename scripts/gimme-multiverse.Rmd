@@ -398,12 +398,11 @@ summary(fit_ind_diff)
 
 ## Emotion Dataset
 Delete reference fit from multiverse dataset.
-TODO it was .51, not .75, so maybe compare to original dataset?
 ```{r}
 ref_fit_ind <- multiverse_grid %>% 
   mutate(spec = dplyr::row_number()) %>% 
   filter(group_cuts == .75 &
-                        sub_cuts == .50 &
+                        sub_cuts == .51 &
                         rmsea_cuts == .05 &
                         srmr_cuts == .05 &
                         nnfi_cuts == .95 &
