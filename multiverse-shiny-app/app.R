@@ -10,12 +10,12 @@ library(here)
 library(fontawesome)#
 library(knitr)
 library(kableExtra)
+library(qgraph)
 
 #--- Variable names
 cond_vars <- c("groupcutoffs", "subcutoffs", "rmsea.cuts", "srmr.cuts",
                "nnfi.cuts", "cfi.cuts", "n.excellent")
 summary_vars <- c("Heterogeneity", 
-                  # "VI", "ARI", "Modularity",
                   "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.", 
                   "Density Temp. Abs. Diff.", "Density Cont. Abs. Diff.")
 
@@ -48,39 +48,16 @@ summary_vars <- c("Heterogeneity",
 #                 "Centrality Diff." = mean_diff_cent_i,
 #                 "Density Temp. Abs. Diff." = mean_abs_diff_dens_temp_i,
 #                 "Density Cont. Abs. Diff." = mean_abs_diff_dens_cont_i) %>%
+#   # recode subgroup cutoffs for consistent display
+#   dplyr::mutate(subcutoffs = if_else(subcutoffs == 0.51, 0.5, subcutoffs)) %>% 
 #   tidyr::unnest(Heterogeneity) %>%
 #   dplyr::select(all_of(summary_vars), all_of(cond_vars))
 # 
 # 
-# saveRDS(comp_pers_app, here("shiny-app/data/comp_pers_app.RDS"))
-# saveRDS(comp_emot_app, here("shiny-app/data/comp_emot_app.RDS"))
+# saveRDS(comp_pers_app, here("multiverse-shiny-app/data/comp_pers_app.RDS"))
+# saveRDS(comp_emot_app, here("multiverse-shiny-app/data/comp_emot_app.RDS"))
 
 
-# # --- Data for testing
-# comp_pers <- readRDS(here("output/mv_personality/comp_pers.RDS"))
-# # nicer column names
-# # TODO will have to do this before I save the datasets for the app
-# # names(comp_pers)
-# comp_pers <- comp_pers %>%
-#   dplyr::rename(Heterogeneity = heterogeneity_g,
-#                 VI = vi,
-#                 ARI = ari,
-#                 Modularity = modularity,
-#                 "Nonzero Edge Diff." = mean_nonzero_diff_edge_i,
-#                 "Adj. Diff." = diff_adj_sum_mean_i,
-#                 "Cent. Diff." = mean_diff_cent_i,
-#                 "Abs. Diff. Density Temp." = mean_abs_diff_dens_temp_i,
-#                 "Abs. Diff. Density Cont." = mean_abs_diff_dens_cont_i) %>% 
-#   unnest(Heterogeneity)
-# 
-# comp_test <- comp_pers %>%
-#   select(all_of(summary_vars), all_of(cond_vars)) %>%
-#   slice_sample(n = 1000)
-# comp_test2 <- comp_pers %>%
-#   select(all_of(summary_vars), all_of(cond_vars)) %>%
-#   slice_sample(n = 1000)
-# saveRDS(comp_test, here("shiny-app/data/comp_test_pers.RDS"))
-# saveRDS(comp_test2, here("shiny-app/data/comp_test_emot.RDS"))
 
 #--- Plots data set
 # Personality
@@ -90,7 +67,7 @@ summary_vars <- c("Heterogeneity",
 #    x[c("group_plot_paths", "path_counts")]
 #  })
 # 
-# saveRDS(mv_res_plots, here("shiny-app/data/mv_pers_plots.RDS"))
+# saveRDS(mv_res_plots, here("multiverse-shiny-app/data/mv_pers_plots.RDS"))
 # rm(mv_res_pers, mv_res_plots)
 # 
 # # Emotion
@@ -99,7 +76,7 @@ summary_vars <- c("Heterogeneity",
 #   x[c("group_plot_paths", "path_counts")]
 # })
 # 
-# saveRDS(mv_res_plots, here("shiny-app/data/mv_emot_plots.RDS"))
+# saveRDS(mv_res_plots, here("multiverse-shiny-app/data/mv_emot_plots.RDS"))
 # rm(mv_res_emot, mv_res_plots)
 
 
@@ -300,7 +277,7 @@ ui <- fluidPage(
                tags$ol(
                  tags$li("Select a dataset from the dropdown menu below. Choose between 'Personality' and 'Emotion'."),
                  tags$li("Below, you will find an explanation of the variable abbrevations used in this app."),
-                 tags$li("Explore the various tabs to analyze the data and visualize insights."),
+                 tags$li("Explore the various tabs to analyze the data and visualize insights.")
                ),
                tags$h2("For more information"),
                tags$p("If you need more details about the methodology behind the research, please refer to the corresponding sections in our paper."),
@@ -392,15 +369,20 @@ ui <- fluidPage(
              sidebarPanel(
                tags$div(
                  class = "well",
-                 tags$h3("Select Specification Values"),
-                 p("Select one value for each specification:"),
+                 tags$h3("Multiverse Networks"),
+                 tags$p("Here, you can explore the multiverse networks for the selected dataset. The networks are displayed graphically according to 
+                        the conventions of the GIMME package. The nodes represent the variables and the edges represent the relationships between them.
+                        Group-level edges are black, subgroup-level edges are green, and inidividual-level edges are grey."),
+                 tags$p("Dashed lines indicate lag-1 associations, solid lines indicate contemporaneous associations. The width of an edge indicates
+                        the strength of the association."),
+                 tags$p("Select one value for each specification:"),
                  selectInput("net_groupcutoffs", "groupcutoffs", choices = c(group_cuts), selected = group_cuts[[3]]),
                  selectInput("net_subcutoffs", "subcutoffs", choices = c(sub_cuts), selected = group_cuts[[3]]),
                  selectInput("net_rmsea.cuts", "rmsea.cuts", choices = c(rmsea_cuts), selected = rmsea_cuts[[2]]),
                  selectInput("net_srmr.cuts", "srmr.cuts", choices = c(srmr_cuts), selected = srmr_cuts[[2]]),
                  selectInput("net_nnfi.cuts", "nnfi.cuts", choices = c(nnfi_cuts), selected = nnfi_cuts[[2]]),
                  selectInput("net_cfi.cuts", "cfi.cuts", choices = c(cfi_cuts), selected = cfi_cuts[[2]]),
-                 selectInput("net_n.excellent", "n.excellent", choices = c(n_excels), selected = n_excels[[2]]),
+                 selectInput("net_n.excellent", "n.excellent", choices = c(n_excels), selected = n_excels[[2]])
                )
              ),
              mainPanel(
@@ -420,7 +402,7 @@ ui <- fluidPage(
   div(
     class = "footer",
     style = "background-color: #f8f9fa; padding: 10px; text-align: center;",
-    HTML(paste("Shiny App for the paper \"Network Multiverse\" (Siepe, Schumacher & Heck, 2023). Find the source code on", 
+    HTML(paste("Shiny App for the paper \"Network Multiverse\" (Siepe & Heck, 2023). Find the source code on", 
                a(href = "https://github.com/bsiepe/network-multiverse", fa("github")),
                "GitHub."
     ))
@@ -509,7 +491,7 @@ server <- function(input, output, session) {
   # Compute and display summary statistics
   output$fg_summary <- renderTable({
     grouped_data() %>%
-      summarise(across(summary_vars, 
+      summarise(across(all_of(summary_vars), 
                        .fns = list(mean = mean, sd = sd),
                        .names = "{.col}_{.fn}"))
     
@@ -549,13 +531,14 @@ server <- function(input, output, session) {
   output$sca_spec <- renderPlot({
     selected_column <- input$sca_column
     
+
+    
     # Generate ggplot boxplot
     plot_specification(mv_res = sel_data(), var = .data[[selected_column]])+
       theme(axis.title = element_text(size = rel(1.5)),
             axis.text = element_text(size = rel(1.5)))
     
-    # # Convert ggplot plot to a Plotly plot
-    # ggplotly(sca_spec_plot) 
+
   })
   
   #--- Create networks
@@ -582,7 +565,7 @@ server <- function(input, output, session) {
              n_excels == input$net_n.excellent) %>% 
         pull(spec)})
       
-    plot(sel_net_data()[[spec_ind_plot()]]$group_plot_paths, margin = c(5,5,5,5))  
+    qgraph:::plot.qgraph(sel_net_data()[[spec_ind_plot()]]$group_plot_paths, margin = c(5,5,5,5))  
     
     
   })
