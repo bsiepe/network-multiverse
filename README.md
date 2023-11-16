@@ -1,5 +1,5 @@
 # Network Multiverse
-This repository contains code and data for the preprint Network Multiverse [(Siepe& Heck, 2023)](https://osf.io/etm3u/). Start the .Rproj var-compare.Rproj prior to running the scripts. We used the `renv` package to create a reproducible environment; more information is contained in the corresponding folder.  
+This repository contains code and data for the preprint *Multiverse analysis for dynamic network models: Investigating the influence of plausible alternative modeling choices* [(Siepe& Heck, 2023)](https://osf.io/etm3u/). Start the .Rproj var-compare.Rproj prior to running the scripts. We used the `renv` package to create a reproducible environment; more information is contained in the corresponding folder.  
 
 Full results of the multiverse analyses are too large and can be requested from the corresponding author. However, we provide all summaries of results necessary to reproduce our analyses in the `output/` folder. 
 
