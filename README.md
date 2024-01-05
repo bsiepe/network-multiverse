@@ -24,7 +24,7 @@ Please note that the package is not actively maintained and may not be up to dat
 
 
 ## Shiny App
-There are multiple ways to run this shiny app. The easiest way is to use the version that is hosted online at (INSERT LINK).
+There are multiple ways to run this shiny app. The easiest way is to use the version that is hosted online [here](https://bsiepe.shinyapps.io/shiny-app/).
 
 Another possibility is to use the `shiny` package in R:
 
