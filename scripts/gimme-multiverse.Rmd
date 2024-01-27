@@ -703,7 +703,7 @@ pct_labels_temp <- paste0(round(t(ref_temp_mat)*100,1), " %")
 pct_labels_cont <- paste0(round(t(ref_cont_mat)*100,1), " %")
 
 # 
-pdf("figures/ref_multi_net_pers.pdf")
+pdf("figures/ref_multi_net_pers_rev1.pdf")
 par(mar=c(1,1,1,1))
 layout(matrix(c(1,2,3,5,1,4,3,6),ncol=2),heights=c(.5,3.5,.5,3.5))
 plot.new()
@@ -725,7 +725,7 @@ qgraph::qgraph(
       # title.cex = 2, 
       label.cex    = 1.25,
       title = "Temporal",
-      maximum = 1)
+      maximum = .15)
 plot.new()
 text(0.5,0.3,"Multiverse Network",cex=1.2,font=1)
 # Contemporaneous
@@ -745,11 +745,11 @@ qgraph::qgraph(
       # title.cex = 2,
       label.cex = 1.25,
       title = "Contemporaneous",
-      maximum = 1)
+      maximum = .15)
 
 multiverse.network(comp_pers, node.width = 2.5,
       node.height = 2.5,cutoff = .05, title.cex = 1, label.cex = 1.25, n_ind = 94,
-                   edge.label.cex = 1.5, fade = TRUE)
+                   edge.label.cex = 1.5, fade = TRUE, maximum = .15)
 
 dev.off()
 
@@ -899,7 +899,7 @@ temp_labels <- c("HighCorr\nPositive", "HighCorr\nNegative", "Enthusiastic",
                  "Emotion\nChronometry")
 cont_labels <- c(temp_labels, "TimeofDay")
 
-pdf("figures/ref_multi_net_emot.pdf")
+pdf("figures/ref_multi_net_emot_rev1.pdf")
 par(mar=c(1,1,1,1))
 layout(matrix(c(1,2,3,5,1,4,3,6),ncol=2),heights=c(.5,3.5,.5,3.5))
 plot.new()
@@ -922,7 +922,7 @@ qgraph::qgraph(
       # title.cex = 2, 
       label.cex    = 1.25,
       title = "Temporal",
-      maximum = 1)
+      maximum = .15)
 plot.new()
 text(0.5,0.3,"Multiverse Network",cex=1.2,font=1)
 
@@ -947,17 +947,19 @@ qgraph::qgraph(
       # title.cex = 2,
       label.cex = 1.25,
       title = "Contemporaneous",
-      maximum = 1)
+      maximum = .15)
 
 
 
 multiverse.network(comp_emot, cutoff = .05, 
                    title.cex = 1, label.cex = 1.25, 
                    n_ind = 105, endogeneous = TRUE, 
+                   edge.label.cex = 1.5,
                    node.width = 2.5,
                    node.height = 2.5,
                    temp_labels = temp_labels, cont_labels = cont_labels,
-                   fade = TRUE)
+                   fade = TRUE,
+                   maximum = .15)
 
 dev.off()
 

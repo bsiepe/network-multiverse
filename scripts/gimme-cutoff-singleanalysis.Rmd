@@ -26,7 +26,7 @@ library(ggh4x)
 library(knitr)
 library(kableExtra)
 library(cowplot)
-source(here::here("scripts/aux_funs.R"))
+# source(here::here("scripts/aux_funs.R"))
 
 ```
 
@@ -556,17 +556,10 @@ sim_res <- SimDesign::runSimulation(sim_design,
 SimClean()
 
 
-saveRDS(sim_res, file = here("output/sim_res.RDS"))
+# saveRDS(sim_res, file = here("output/simulation/sim_res.RDS"))
+sim_res <- readRDS(here("output/simulation/sim_res.RDS"))
+)
 ```
-
-Had to resummarize due to previous bugs, now fixed
-```{r}
-# sim_res <- SimDesign::reSummarise(sim_summarize,
-#                        dir = here("scripts/SimDesign-results_pc04669"))
-sim_res <- readRDS(here("output/sim_res.RDS"))
-
-```
-
 
 
 # Analyze results
@@ -637,8 +630,8 @@ fig_sim_bias <- sim_res_long %>%
   mutate(across(c(n_ind, ind_a, ind_phi),
                 ~as.factor(.))) %>% 
   ggplot(aes(x = n_ind, y = m, color = method, fill = method))+
-  geom_errorbar(aes(ymin = m - 1.96*mcse,
-                            ymax = m + 1.96*mcse),
+  geom_errorbar(aes(ymin = m - 1*mcse,
+                            ymax = m + 1*mcse),
                         width = .8, 
                  position = position_dodge(0.5),
                  show.legend = FALSE)+
@@ -671,8 +664,8 @@ fig_recall <- sim_res_long %>%
                 ~as.factor(.))) %>% 
   rename(Method = method) %>% 
   ggplot(aes(x = n_ind, y = m, color = Method, fill = Method))+
-  geom_errorbar(aes(ymin = m - 1.96*mcse,
-                            ymax = m + 1.96*mcse),
+  geom_errorbar(aes(ymin = m - 1*mcse,
+                            ymax = m + 1*mcse),
                         width = .8,
                  position = position_dodge(0.5),
                  show.legend = FALSE)+
@@ -705,8 +698,8 @@ fig_precision <- sim_res_long %>%
                 ~as.factor(.))) %>% 
   rename(Method = method) %>% 
   ggplot(aes(x = n_ind, y = m, color = Method, fill = Method))+
-  geom_errorbar(aes(ymin = m - 1.96*mcse,
-                            ymax = m + 1.96*mcse),
+  geom_errorbar(aes(ymin = m - 1*mcse,
+                            ymax = m + 1*mcse),
                         width = .8,
                  position = position_dodge(0.5),
                  show.legend = FALSE)+

@@ -573,7 +573,6 @@ multiverse.network <- function(mv_res,
       # title.cex = 2, 
       # label.cex    = 1.25,
       title = "Temporal",
-      maximum = 1,
       ...)
     
     # Contemporaneous
@@ -590,7 +589,6 @@ multiverse.network <- function(mv_res,
       # title.cex = 2,
       # label.cex = 1.25,
       title = "Contemporaneous",
-      maximum = 1, 
       ...)
     
   }
