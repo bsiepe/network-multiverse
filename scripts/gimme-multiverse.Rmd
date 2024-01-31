@@ -543,6 +543,37 @@ comp_emot %>%
 
 ```
 
+For the revision: Look at subgroup and group paths 
+```{r}
+
+# Obtain edge index of paths with group effects
+group_path_index <-lapply(mv_res_emot, function(x){
+  df_ft <- data.frame(from = x$group_plot_paths$Edgelist$from,
+                      to = x$group_plot_paths$Edgelist$to,
+                      weight = x$group_plot_paths$Edgelist$weight)
+  
+  group_path <- df_ft %>% 
+    filter(weight == 1) %>% 
+    filter(from != to) %>% 
+    select(from, to)
+  
+  return(group_path)
+  
+}
+)
+
+
+
+
+# Obtain edge index of paths with subgroup effects
+sub_path_index <-lapply(mv_res_emot, function(x){
+  which(x$group_plot_paths[["Arguments"]][["edge.color"]] %in% "green3")
+}
+)
+
+
+
+```
 
 
 
