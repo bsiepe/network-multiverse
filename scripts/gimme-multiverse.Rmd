@@ -268,6 +268,8 @@ summary(n_group_paths)
 prop.table(table(n_group_paths))
 ```
 Which group-level paths were found most often?
+The wording here is confusing: It should actually be called homogeneity if we want to interpret higher values as more homogeneous. 
+Please see the revised version of the manuscript for details. 
 ```{r}
 Reduce('+', comp_pers$adjacency_g)
 

@@ -15,8 +15,8 @@ library(qgraph)
 #--- Variable names
 cond_vars <- c("groupcutoffs", "subcutoffs", "rmsea.cuts", "srmr.cuts",
                "nnfi.cuts", "cfi.cuts", "n.excellent")
-summary_vars <- c("Heterogeneity", 
-                  "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.", 
+summary_vars <- c("Homogeneity",
+                  "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.",
                   "Density Temp. Abs. Diff.", "Density Cont. Abs. Diff.")
 
 # --- Create actual data sets
@@ -24,7 +24,7 @@ summary_vars <- c("Heterogeneity",
 # comp_pers <- readRDS(here("output/mv_personality/comp_pers_upd.RDS"))
 # 
 # comp_pers_app <- comp_pers %>%
-#     dplyr::rename(Heterogeneity = heterogeneity_g,
+#     dplyr::rename(Homogeneity = heterogeneity_g,
 #                   VI = vi,
 #                   ARI = ari,
 #                   Modularity = modularity,
@@ -33,13 +33,13 @@ summary_vars <- c("Heterogeneity",
 #                   "Centrality Diff." = mean_diff_cent_i,
 #                   "Density Temp. Abs. Diff." = mean_abs_diff_dens_temp_i,
 #                   "Density Cont. Abs. Diff." = mean_abs_diff_dens_cont_i) %>%
-#     tidyr::unnest(Heterogeneity) %>%
+#     tidyr::unnest(Homogeneity) %>%
 #     dplyr::select(all_of(summary_vars), all_of(cond_vars))
 # 
 # comp_emot <- readRDS(here("output/mv_emotion/comp_emot_upd.RDS"))
 # 
 # comp_emot_app <- comp_emot %>%
-#   dplyr::rename(Heterogeneity = heterogeneity_g,
+#   dplyr::rename(Homogeneity = heterogeneity_g,
 #                 VI = vi,
 #                 ARI = ari,
 #                 Modularity = modularity,
@@ -49,8 +49,8 @@ summary_vars <- c("Heterogeneity",
 #                 "Density Temp. Abs. Diff." = mean_abs_diff_dens_temp_i,
 #                 "Density Cont. Abs. Diff." = mean_abs_diff_dens_cont_i) %>%
 #   # recode subgroup cutoffs for consistent display
-#   dplyr::mutate(subcutoffs = if_else(subcutoffs == 0.51, 0.5, subcutoffs)) %>% 
-#   tidyr::unnest(Heterogeneity) %>%
+#   dplyr::mutate(subcutoffs = if_else(subcutoffs == 0.51, 0.5, subcutoffs)) %>%
+#   tidyr::unnest(Homogeneity) %>%
 #   dplyr::select(all_of(summary_vars), all_of(cond_vars))
 # 
 # 
@@ -308,7 +308,7 @@ ui <- fluidPage(
                  tags$p("Grouped summary statistics provide insights into how different variables interact and vary across various groups."),
                  tags$p("Choose one or more variables from the dropdown menu to group the summary statistics by those variables."),
                  tags$p("The string after the underscore(_) at the end of a variable name indicates the summary statistic for the grouping."),
-                 tags$p("For example, Heterogeneity_sd is the standard deviation of the heterogeneity within a given grouping."),
+                 tags$p("For example, Homogeneity_sd is the standard deviation of the homogeneity within a given grouping."),
                  selectInput("groupby_vars",
                              label = "Group by:",
                              choices = cond_vars,
@@ -454,7 +454,7 @@ server <- function(input, output, session) {
   
   #--- Variables explained
   variable_data <- data.frame(
-    Variable = c("Heterogeneity", "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.",
+    Variable = c("Homogeneity", "Nonzero Edge Diff.", "Adjacency Diff.", "Centrality Diff.",
                  "Density Temp. Abs. Diff.", "Density Cont. Abs. Diff."),
     Explanation = c(
       "Proportion of group-level edges to all edges.",

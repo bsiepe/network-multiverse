@@ -878,6 +878,10 @@ multiverse.compare.group <- function(l_res,
   )
   
   #--- Heterogeneity
+  # as pointed out in a revision of the manuscript, this measure
+  # should rather be called homogeneity to be better understandable
+  # we kept the name here, as we did not want to rerun the whole multiverse
+  # and change the results
   ## divide no. of group edges by no. of total edges
   l_heterogeneity <- list()
   for(i in 1:length(l_adjacency)){
