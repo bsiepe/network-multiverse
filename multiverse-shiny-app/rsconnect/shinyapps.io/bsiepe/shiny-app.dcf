@@ -5,6 +5,6 @@ account: bsiepe
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 10502531
-bundleId: 7919973
+bundleId: 8206103
 url: https://bsiepe.shinyapps.io/shiny-app/
 version: 1
