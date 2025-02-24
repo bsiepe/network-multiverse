@@ -293,7 +293,9 @@ ui <- fluidPage(
              h2("Variable Name Explanations"),
              p("All differences here are calculated as reference fit - multiverse fit. For example, a negative density difference means that the multiverse fit has a higher density."),
              p("Also, note that the lowest subgroup cutoff for the emotion data set is 51% instead of 50%, which is explained in the manuscript."),
-             tableOutput("variable_table")
+             tableOutput("variable_table"),
+             tags$br(),
+             tags$br()
            )
   ),
 
@@ -442,7 +444,7 @@ server <- function(input, output, session) {
     dataset_name <- input$dataset
     
     if (dataset_name == "Personality") {
-      "You have chosen the personality data set by Wright et al.(2019) containing data of 94 participants.\n
+      "You have chosen the personality data set by Wright et al. (2019) containing data of 94 participants.\n
       It can be obtained at https://osf.io/95hyr/"
     } else if (dataset_name == "Emotion") {
       "You have chosen emotion data set by Kullar et al. (2023) containing data of 105 participants.\n
