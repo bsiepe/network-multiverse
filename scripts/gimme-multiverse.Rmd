@@ -115,7 +115,7 @@ mv_res_emot <- mvgimme::multiverse.gimme(data = here("data/kullar_2023/finaloutp
 
 # 248908.521 sec
 # saveRDS(mv_res_emot, file = here("output/mv_emotion/mv_res_emot_new51.RDS"))
-mv_res_emot <- readRDS(here("output/mv_emotion/mv_res_emot_new51.RDS"))
+mv_res_emot <- readRDS(here::here("output/mv_emotion/mv_res_emot_new51.RDS"))
 
 
 ```
@@ -404,7 +404,7 @@ Delete reference fit from multiverse dataset.
 ref_fit_ind <- multiverse_grid %>% 
   mutate(spec = dplyr::row_number()) %>% 
   filter(group_cuts == .75 &
-                        sub_cuts == .51 &
+                        sub_cuts == .50 &
                         rmsea_cuts == .05 &
                         srmr_cuts == .05 &
                         nnfi_cuts == .95 &
@@ -858,6 +858,100 @@ rm(spec_plot_dens_pers)
 ```
 
 
+### Presentation Visualization
+We create similar plots for a presentation.
+
+For the network, only show the contemporaneous networks:
+
+```{r}
+ref_pct_mat <- ref_fit_pers_og$path_counts/94
+ref_pct_mat[abs(ref_pct_mat) < 0.05] <- 0
+ref_temp_mat <- ref_pct_mat[,1:6]
+ref_cont_mat <- ref_pct_mat[,7:12]
+
+pct_labels_cont_ref <- paste0(round(t(ref_cont_mat)*100,1), " %")
+
+pdf("figures/ref_multi_net_pers_presentation.pdf", width = 9, height = 4.5)
+par(mar=c(1,1,1,1))
+layout(matrix(1:2, nrow = 1))  # 1 row, 2 columns
+# text(0.5,0.3,"Reference Network",cex=1.3,font=1)
+
+# text(0.5,0.3,"Multiverse Network",cex=1.2,font=1)
+# Contemporaneous
+qgraph::qgraph(
+      input = t(ref_cont_mat), 
+      layout  = "circle",
+      lty = 1,
+      node.width = 1.5,
+      node.height = 1.5,
+      edge.labels  = pct_labels_cont_ref,
+      theme = "colorblind",
+      fade = TRUE,
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      edge.label.cex = 1.5,
+      # arrows   = FALSE,
+      labels = colnames(ref_cont_mat),
+      # title.cex = 2,
+      label.cex = 1.25,
+      title.cex = 1.3,
+      title = "Reference")
+
+
+mv_res = comp_pers
+node.width = 2.5
+node.height = 2.5
+cutoff = .05
+title.cex = 1
+label.cex = 1.25
+n_ind = 94
+edge.label.cex = 1.5
+fade = TRUE
+maximum = .15
+n_lagged = NULL
+
+count_mat <- Reduce('+', lapply(mv_res$l_adj_i, function(x){
+    x <- Filter(function(entry) is.double(entry), x)
+    as.matrix(Reduce('+', x))
+  }))
+# Convert to proportions
+prop_mat <- count_mat / (nrow(mv_res) * n_ind)
+  
+# Cutoff option
+if(!is.null(cutoff)){
+  prop_mat[abs(prop_mat) < cutoff] <- 0
+}
+  
+# Split matrix based on lag vs. non-lagged
+if(is.null(n_lagged)){
+  # round down for odd numbers
+  n_lagged <-  floor(ncol(prop_mat)/2)
+}
+
+cont_mat <- prop_mat[, (n_lagged + 1): ncol(prop_mat)]
+pct_labels_cont <- paste0(round(t(cont_mat)*100,1), " %")
+
+qgraph::qgraph(
+      input = t(cont_mat), 
+      layout  = "circle",
+      lty = 1,
+      node.width = 1.5,
+      node.height = 1.5,
+      edge.labels = pct_labels_cont,
+      edge.label.cex = 1.5,
+      theme = "colorblind",
+      fade = TRUE,
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      # arrows   = FALSE,
+      labels = colnames(cont_mat),
+      # title.cex = 2,
+      label.cex = 1.25,
+      title.cex = 1.3,
+      title = "Multiverse")
+
+dev.off()
+```
 
 
 ## Emotion Dataset
@@ -1074,6 +1168,155 @@ rm(spec_plot_dens_emot)
 
 ```
 
+
+### Presentation Visualization
+We create similar plots for a presentation.
+
+
+#### Network Multiverse
+For the network, only show the contemporaneous networks:
+
+```{r}
+ref_pct_mat <- ref_fit_emot_og$path_counts/104
+ref_pct_mat[abs(ref_pct_mat) < 0.05] <- 0
+ref_temp_mat <- ref_pct_mat[,1:9]
+ref_cont_mat <- ref_pct_mat[,10:19]
+
+
+pct_labels_cont_ref <- paste0(round(t(ref_cont_mat)*100,1), " %")
+
+# labels
+temp_labels <- c("HighCorr\nPositive", "HighCorr\nNegative", "Enthusiastic",
+                 "Relaxed", "Sad", "Nervous", "Stressed", "MWoccur",
+                 "Emotion\nChronometry")
+cont_labels <- c(temp_labels, "TimeofDay")
+
+
+pdf("figures/ref_multi_net_emot_presentation.pdf", width = 9, height = 4.5)
+par(mar=c(1,1,1,1))
+layout(matrix(1:2, nrow = 1))  # 1 row, 2 columns
+# text(0.5,0.3,"Reference Network",cex=1.3,font=1)
+
+# text(0.5,0.3,"Multiverse Network",cex=1.2,font=1)
+# Contemporaneous
+qgraph::qgraph(
+      input = t(ref_cont_mat), 
+      layout  = "circle",
+      lty = 1,
+      node.width = 1.5,
+      node.height = 1.5,
+      edge.labels  = pct_labels_cont_ref,
+      theme = "colorblind",
+      fade = TRUE,
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      edge.label.cex = 1.5,
+      # arrows   = FALSE,
+      labels = cont_labels,
+      # title.cex = 2,
+      label.cex = 1.25,
+      title.cex = 1.3,
+      title = "Reference")
+
+
+mv_res = comp_emot
+node.width = 2.5
+node.height = 2.5
+cutoff = .05
+title.cex = 1
+label.cex = 1.25
+n_ind = 105
+edge.label.cex = 1.5
+fade = TRUE
+maximum = .15
+n_lagged = NULL
+
+count_mat <- Reduce('+', lapply(mv_res$l_adj_i, function(x){
+    x <- Filter(function(entry) is.double(entry), x)
+    as.matrix(Reduce('+', x))
+  }))
+# Convert to proportions
+prop_mat <- count_mat / (nrow(mv_res) * n_ind)
+  
+# Cutoff option
+if(!is.null(cutoff)){
+  prop_mat[abs(prop_mat) < cutoff] <- 0
+}
+  
+# Split matrix based on lag vs. non-lagged
+if(is.null(n_lagged)){
+  # round down for odd numbers
+  n_lagged <-  floor(ncol(prop_mat)/2)
+}
+
+
+
+cont_mat <- prop_mat[, (n_lagged + 1): ncol(prop_mat)]
+
+
+# insert zero for endogeneous variable
+cont_mat <- rbind(cont_mat, rep(0, n_lagged + 1))
+pct_labels_cont <- paste0(round(t(cont_mat)*100,1), " %")
+
+qgraph::qgraph(
+      input = t(cont_mat), 
+      layout  = "circle",
+      lty = 1,
+      node.width = 1.5,
+      node.height = 1.5,
+      edge.labels = pct_labels_cont,
+      edge.label.cex = 1.5,
+      theme = "colorblind",
+      fade = TRUE,
+      negDashed = TRUE,
+      parallelEdge = TRUE,
+      # arrows   = FALSE,
+      labels = cont_labels,
+      # title.cex = 2,
+      label.cex = 1.25,
+      title.cex = 1.3,
+      title = "Multiverse")
+
+dev.off()
+```
+
+#### SCA Adjacency
+
+```{r}
+# for correct colors
+sub_cuts <- c(.51, .60, .75, .80)
+
+plot_out_adj_emot <- plot_outcome(mv_res = comp_emot, var = diff_adj_sum_mean_i,
+                                  y_label = "Mean Difference") +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1.5)),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"))+
+          # add reference line
+  geom_hline(yintercept = 0, color = "black", lty = 2)+
+  scale_x_continuous(limits = c(0,3888), expand = c(0,0))
+
+# specification plot
+
+plot_spec_adj_emot <- plot_specification(mv_res = comp_emot, var = diff_adj_sum_mean_i)+
+  theme(axis.title = element_text(size = rel(1.8)),
+        axis.text = element_text(size = rel(1.8)),
+        # decrease spacing between facets
+        panel.spacing = unit(0.5, "lines"),
+        strip.text.y.left = element_text(size = rel(1)),
+        # increase legend text
+        legend.text = element_text(size = rel(1.5)),
+        legend.title = element_text(size = rel(1.7)),
+        plot.margin = unit(c(0, 0, 0, 0), "cm")
+        )+
+  scale_x_continuous(limits = c(0,3888), expand = c(0,0))
+
+# Combine Plots
+spec_plot_adj_emot <- cowplot::plot_grid(plot_out_adj_emot, plot_spec_adj_emot, 
+                   nrow = 2, align = "h", axis = "bt",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_adj_emot_presentation.pdf", spec_plot_adj_emot, path = here("figures/"),
+       device = "pdf", height = 9, width = 14)
+```
 
 
 # Session Info
