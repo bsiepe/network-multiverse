@@ -1319,6 +1319,60 @@ ggsave("spec_plot_adj_emot_presentation.pdf", spec_plot_adj_emot, path = here("f
 ```
 
 
+We create a similar plot for my doctoral thesis, where we want somewhat more readable labels: 
+
+```{r}
+#| label: spec-plot-adj-emot-thesis
+
+sub_cuts <- c(.51, .60, .75, .80)
+
+plot_out_adj_emot <- plot_outcome(mv_res = comp_emot,
+                                  var = diff_adj_sum_mean_i,
+                                  y_label = "Mean Adjacency Matrix Difference") +
+  theme(axis.title = element_text(size = rel(1.9)),
+        axis.text = element_text(size = rel(1.9)),
+        axis.title.y = element_text(margin = margin(r = 5))) +
+  # add reference line
+  geom_hline(yintercept = 0,
+             color = "black",
+             lty = 2) +
+  scale_x_continuous(
+    limits = c(0, 4000),
+    expand = c(0, 0),
+    breaks = c(0, 1000, 2000, 3000, 3888)
+  )
+
+
+plot_spec_adj_emot <- plot_specification(mv_res = comp_emot, var = diff_adj_sum_mean_i) +
+  theme(
+    axis.title = element_text(size = rel(1.8)),
+    axis.text = element_text(size = rel(1.8)),
+    axis.title.x = element_text(margin = margin(t = 10)),
+    # decrease spacing between facets
+    panel.spacing = unit(0.2, "lines"),
+    strip.text.y.left = element_text(size = rel(1)),
+    # increase legend text
+    legend.text = element_text(size = rel(1.7)),
+    legend.title = element_text(size = rel(1.9)),
+    legend.key.spacing.x = unit(0.1, "lines"),
+    # align legend at the center
+    legend.justification = "center"
+  ) +
+  scale_x_continuous(
+    limits = c(0, 4000),
+    expand = c(0, 0),
+    breaks = c(0, 1000, 2000, 3000, 3888)
+  )
+
+# Combine Plots
+spec_plot_adj_emot <- cowplot::plot_grid(plot_out_adj_emot, plot_spec_adj_emot, 
+                   nrow = 2, align = "h",
+                   rel_heights = c(0.5,1))
+ggsave("spec_plot_adj_emot_thesis.pdf", spec_plot_adj_emot, path = here("figures/"),
+       device = "pdf", height = 16*0.9, width = 16*0.85)
+```
+
+
 # Session Info
 ```{r}
 # create session info
