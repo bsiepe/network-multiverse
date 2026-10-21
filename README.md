@@ -45,3 +45,12 @@ shiny::runApp()
 ```
 
 If you happen to have any problems with the code or any suggestions for further improvement, feel free to contact me via the email listed in my GitHub account. 
+
+## License
+
+This repository contains materials distributed under different licenses:
+
+- **Source code:** Licensed under the [MIT License](LICENSE).
+- **Data and other non-code materials:** Licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+Unless otherwise stated, the above licenses apply to the respective categories of materials. Any third-party materials remain subject to their own license terms.
